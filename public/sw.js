@@ -1,6 +1,6 @@
 // 서비스워커: 홈 화면 앱으로 설치되게 하고, 화면 파일을 미리 저장해 빨리 열리게 한다.
 // /api, /auth 요청과 녹음 데이터는 절대 저장하지 않는다.
-const VERSION = 'vn-shell-v10';
+const VERSION = 'vn-shell-v11';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/i18n.js', '/recorder.js', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {

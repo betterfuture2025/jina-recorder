@@ -56,6 +56,29 @@ export const TEMPLATES = {
       footer: '',
     },
   },
+  summary: {
+    label: '요약 메일',
+    about: '녹음이 끝나고 AI가 정리하면 기록한 선생님(과 같이 받을 사람)에게 가는 메일',
+    sticker: 'present',
+    vars: ['앱이름', '제목', '종류', '일시', '선생님', '길이'],
+    sample: {
+      제목: '하윤이 어머님 상담 — 낮잠 적응', 종류: '상담', 일시: '2026.11.16 (월) 오후 3:10', 선생님: '김하늘', 길이: '13분',
+      __summary: ['아침 등원 때 우는 시간이 첫 주보다 크게 줄었음', '집에서 친구 이름(서아)을 자주 말함', '낮잠은 아직 힘들어함'],
+      __decisions: ['다음 주부터 낮잠용 담요를 집에서 가져오기로 함'],
+      __todos: ['금요일에 어머님께 낮잠 상황 다시 알리기'],
+      __tags: ['하윤', '적응', '낮잠'],
+      __link: '/#/records',
+    },
+    block: 'summary',
+    link: '/#/records',
+    defaults: {
+      subject: '[{{앱이름}}] {{제목}} 요약',
+      heading: '{{제목}}',
+      body: '{{일시}} · {{종류}} · {{길이}} · {{선생님}}',
+      button: '기록 열어 보기',
+      footer: 'AI가 받아쓴 글을 정리한 요약이에요. 중요한 내용은 원래 녹음으로 꼭 확인해 주세요.',
+    },
+  },
   test: {
     label: '연결 테스트',
     about: '설정 페이지에서 "테스트 메일 보내기"를 누르면 가는 메일',
@@ -116,6 +139,18 @@ function blockHtml(tpl, vars) {
           <td style="padding:10px 14px;${i ? `border-top:1px solid ${C.line};` : ''}font-family:${FONT};font-size:15px;color:${C.ink}">${esc(v)}</td></tr>`).join('')}
       </table></td></tr>`;
   }
+  if (tpl.block === 'summary') {
+    const sec = (title, items, mark) => (items && items.length) ? `
+      <tr><td style="padding:6px 28px 4px;font-family:${FONT};font-size:13px;font-weight:700;color:${C.teal}">${title}</td></tr>
+      <tr><td style="padding:0 28px 10px">${items.map((x) => `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td width="22" style="vertical-align:top;padding:3px 0;font-family:${FONT};font-size:15px;color:${C.teal}">${mark}</td>
+          <td style="padding:3px 0;font-family:${FONT};font-size:15px;line-height:1.6;color:${C.ink};word-break:keep-all">${esc(x)}</td>
+        </tr></table>`).join('')}</td></tr>` : '';
+    const tags = (vars.__tags || []).length ? `<tr><td style="padding:4px 28px 6px">${vars.__tags.map((x) =>
+      `<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 11px;border-radius:999px;background:${C.sage};color:${C.tealDark};font-family:${FONT};font-size:13px;font-weight:600">#${esc(x)}</span>`).join('')}</td></tr>` : '';
+    return sec('요약', vars.__summary, '•') + sec('정한 것', vars.__decisions, '✓') + sec('할 일', vars.__todos, '☐') + tags;
+  }
   return '';
 }
 
@@ -127,7 +162,7 @@ export function buildEmail(key, fields, vars, site) {
   const bodyText = fill(fields.body, v);
   const footer = fill(fields.footer, v);
   const button = fill(fields.button, v);
-  const href = site + tpl.link;
+  const href = site + (v.__link || tpl.link);
   const appName = v['앱이름'] || '지나기록기';
   const paras = bodyText.split(/\n{2,}/).map((p) =>
     `<p style="margin:0 0 12px;font-family:${FONT};font-size:16px;line-height:1.65;color:${C.body};word-break:keep-all">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
@@ -167,7 +202,9 @@ export function buildEmail(key, fields, vars, site) {
   const facts = tpl.block === 'facts'
     ? '\n' + [['이름', v['신청자']], ['이메일', v['신청자이메일']], ['직책', v['직책']], ['전화번호', v['전화번호']], ['메모', v['메모']]]
       .filter(([, x]) => x).map(([k, x]) => `${k}: ${x}`).join('\n') + '\n' : '';
-  const code = tpl.block === 'code' ? `\n인증번호: ${v['인증번호']}\n` : '';
+  const code = tpl.block === 'code' ? `\n인증번호: ${v['인증번호']}\n`
+    : tpl.block === 'summary' ? [['요약', v.__summary, '-'], ['정한 것', v.__decisions, '-'], ['할 일', v.__todos, '[ ]']]
+      .filter(([, a]) => a && a.length).map(([h, a, m]) => `\n${h}\n${a.map((x) => `${m} ${x}`).join('\n')}`).join('\n') + '\n' : '';
   const text = `${heading}\n\n${bodyText}\n${code}${facts}${button ? `\n${button}: ${href}\n` : ''}${footer ? `\n${footer}\n` : ''}\n— ${appName}`;
   return { subject, html, text };
 }

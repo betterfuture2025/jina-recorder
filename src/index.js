@@ -3,6 +3,11 @@
 import { json, fail, HttpError, normEmail } from './util.js';
 import { ensureSchema } from './schema.js';
 import { startEmailLogin, verifyEmailLogin, testMail } from './emailLogin.js';
+import { summarize, editSummary, editTags, mailSummary, allTags } from './summary.js';
+import { listContacts, createContact, updateContact, deleteContact, setPeople } from './contacts.js';
+import { insightsOverview, runInsights, getInsight, unsummarized, exportCsv } from './insights.js';
+import { isDriveState, startDrive, finishDrive, disconnectDrive, driveStatus, backupRecording, pendingBackups } from './drive.js';
+import { testAi } from './ai.js';
 import { listTemplates, saveTemplate, resetTemplate, previewTemplate, testTemplate } from './mailTemplates.js';
 import { submitSignup, listSignups, decideSignup } from './signup.js';
 import { passwordLogin, changeMyPassword, adminSetPassword } from './password.js';
@@ -43,7 +48,11 @@ async function route(request, env, ctx) {
 
   // ── 로그인 ──
   if (path === '/auth/login' && m === 'GET') return startGoogleLogin(env, request);
-  if (path === '/auth/callback' && m === 'GET') return finishGoogleLogin(env, request);
+  if (path === '/auth/callback' && m === 'GET') {
+    if (isDriveState(request)) return finishDrive(env, request, await requireAdmin(env, request, ctx));
+    return finishGoogleLogin(env, request);
+  }
+  if (path === '/auth/drive' && m === 'GET') { await requireAdmin(env, request, ctx); return startDrive(env, request); }
 
   // 로컬 개발 전용 로그인 (.dev.vars 에 DEV_LOGIN=1 이고 localhost 일 때만)
   if (path === '/auth/dev-login' && m === 'GET') {
@@ -96,6 +105,15 @@ async function route(request, env, ctx) {
     if (path === '/api/admin/settings/test-google' && m === 'POST') return testGoogle(env, request);
     if (path === '/api/admin/settings/test-mail' && m === 'POST') return testMail(env, me, request);
     if (path === '/api/admin/mail-templates' && m === 'GET') return listTemplates(env);
+    if (path === '/api/admin/ai-test' && m === 'POST') { const b = await request.json().catch(() => ({})); return json(await testAi(env, b.job === 'analysis' ? 'analysis' : 'summary')); }
+    if (path === '/api/admin/insights' && m === 'GET') return insightsOverview(env, request);
+    if (path === '/api/admin/insights' && m === 'POST') return runInsights(env, request, me);
+    { const im = path.match(/^\/api\/admin\/insights\/([\w-]{36})$/); if (im && m === 'GET') return getInsight(env, im[1]); }
+    if (path === '/api/admin/unsummarized' && m === 'GET') return unsummarized(env, request);
+    if (path === '/api/admin/export.csv' && m === 'GET') return exportCsv(env, request, me);
+    if (path === '/api/admin/drive' && m === 'GET') return json(await driveStatus(env));
+    if (path === '/api/admin/drive' && m === 'DELETE') return disconnectDrive(env, me);
+    if (path === '/api/admin/drive/pending' && m === 'GET') return pendingBackups(env);
     {
       const mt = path.match(/^\/api\/admin\/mail-templates\/([a-z_]+)(\/preview|\/test)?$/);
       if (mt) {
@@ -107,12 +125,23 @@ async function route(request, env, ctx) {
     }
   }
 
+  // ── 태그·원아/학부모 (로그인한 사람) ──
+  if (path === '/api/tags' && m === 'GET') return allTags(env, await requireUser(env, request, ctx));
+  if (path.startsWith('/api/contacts')) {
+    const user = await requireUser(env, request, ctx);
+    if (path === '/api/contacts' && m === 'GET') return listContacts(env, request);
+    if (path === '/api/contacts' && m === 'POST') return createContact(env, request, user);
+    const cm = path.match(/^\/api\/contacts\/([\w-]{36})$/);
+    if (cm && m === 'PATCH') return updateContact(env, request, user, cm[1]);
+    if (cm && m === 'DELETE') return deleteContact(env, user, cm[1]);
+  }
+
   // ── 녹음 (로그인한 사람) ──
   if (path.startsWith('/api/recordings')) {
     const user = await requireUser(env, request, ctx);
     if (path === '/api/recordings' && m === 'GET') return listRecordings(env, request, user);
     if (path === '/api/recordings' && m === 'POST') return createRecording(env, request, user);
-    const rm = path.match(/^\/api\/recordings\/([\w-]{36})(?:\/(chunks\/(\d+)|finish|retry-stt))?$/);
+    const rm = path.match(/^\/api\/recordings\/([\w-]{36})(?:\/(chunks\/(\d+)|finish|retry-stt|summarize|summary|tags|people|mail|drive))?$/);
     if (rm) {
       const [, id, sub, seq] = rm;
       if (!sub && m === 'GET') return getRecording(env, user, id);
@@ -122,6 +151,12 @@ async function route(request, env, ctx) {
       if (seq !== undefined && m === 'GET') return getChunkAudio(env, user, id, seq);
       if (sub === 'finish' && m === 'POST') return finishRecording(env, request, user, id);
       if (sub === 'retry-stt' && m === 'POST') return retryStt(env, user, id);
+      if (sub === 'summarize' && m === 'POST') { const b = await request.clone().json().catch(() => ({})); return summarize(env, request, user, id, { force: !!b.force }); }
+      if (sub === 'summary' && m === 'PUT') return editSummary(env, request, user, id);
+      if (sub === 'tags' && m === 'PUT') return editTags(env, request, user, id);
+      if (sub === 'people' && m === 'PUT') return setPeople(env, request, user, id);
+      if (sub === 'mail' && m === 'POST') return mailSummary(env, request, user, id);
+      if (sub === 'drive' && m === 'POST') return backupRecording(env, request, user, id);
     }
   }
 

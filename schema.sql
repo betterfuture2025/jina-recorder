@@ -216,3 +216,15 @@ CREATE TABLE IF NOT EXISTS mail_templates (
   footer TEXT,
   updated_at TEXT
 );
+
+-- 관리자 AI 분석 결과 (파트 7)
+CREATE TABLE IF NOT EXISTS insights (
+  id          TEXT PRIMARY KEY,
+  created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+  days        INTEGER NOT NULL,
+  record_count INTEGER,
+  body        TEXT,
+  model       TEXT,
+  provider    TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);

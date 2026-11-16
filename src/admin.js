@@ -168,10 +168,14 @@ export async function updateMe(env, request, me) {
 
 // 누구나 볼 수 있는 기본 정보 (로그인 화면용)
 export async function publicConfig(env) {
-  const [name, clientId, emailReady] = await Promise.all([
+  const [name, clientId, emailReady, autoSummary, driveToken, driveAuto] = await Promise.all([
     getSetting(env, 'app.name'), getSetting(env, 'google.client_id'), mailReady(env),
+    getSetting(env, 'ai.auto_summary'), getSetting(env, 'drive.refresh_token').catch(() => null), getSetting(env, 'drive.auto'),
   ]);
-  return json({ appName: name || '지나기록기', googleReady: !!clientId, emailReady });
+  return json({
+    appName: name || '지나기록기', googleReady: !!clientId, emailReady,
+    autoSummary: autoSummary !== '0', driveReady: !!driveToken, driveAuto: !!driveToken && driveAuto === '1',
+  });
 }
 
 export { createSession };

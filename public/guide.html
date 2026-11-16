@@ -120,6 +120,7 @@ ol.steps > li:not(:last-child)::after{content:'';position:absolute;left:16px;top
 .back{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-weight:700;text-decoration:none;background:var(--green);color:#fff;border-radius:14px;min-height:52px;padding:0 20px}
 kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:6px;padding:0 6px;font-size:.92em}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+.note{margin:14px 0 0;padding:12px 16px;border-radius:14px;background:#F6E3B4;color:#5A4200;font-size:15px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -145,8 +146,10 @@ kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px sol
     <li><a href="#login"><span class="ico" style="background:var(--green-soft);color:var(--green)">2</span><span><span data-en="Sign in">로그인하기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
     <li><a href="#record"><span class="ico" style="background:var(--red-soft);color:var(--red)">3</span><span><span data-en="Record">녹음하기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
     <li><a href="#board"><span class="ico" style="background:var(--green-soft);color:var(--green)">4</span><span><span data-en="Find notes">게시판에서 찾기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
-    <li><a href="#admin"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">5</span><span><span data-en="Manage teachers">선생님 관리</span><span class="who" data-en="Admins">관리자</span></span></a></li>
-    <li><a href="#mail"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">6</span><span><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="who" data-en="Admins · once">관리자 · 처음 한 번</span></span></a></li>
+    <li><a href="#summary"><span class="ico" style="background:var(--green-soft);color:var(--green)">5</span><span><span data-en="AI summary">AI 요약 보기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
+    <li><a href="#admin"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">6</span><span><span data-en="Manage teachers">선생님 관리</span><span class="who" data-en="Admins">관리자</span></span></a></li>
+    <li><a href="#mail"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">7</span><span><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="who" data-en="Admins · once">관리자 · 처음 한 번</span></span></a></li>
+    <li><a href="#ai"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">8</span><span><span data-en="AI, insights &amp; backup">AI · 분석 · 백업</span><span class="who" data-en="Admins">관리자</span></span></a></li>
   </ul>
 
   <!-- 1. 홈 화면에 추가 -->
@@ -257,11 +260,12 @@ kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px sol
           <div class="d">2026.11.13 (금)</div>
           <div class="c"><b>혼자 메모</b>교구 주문할 것…</div>
         </div>
-        <div class="ph-tabs"><span style="color:var(--ink)">게시판</span><span>녹음</span><span>관리</span><span>내 정보</span></div>
+        <div class="ph-tabs"><span style="color:var(--ink)">게시판</span><span>녹음</span><span>내 정보</span></div>
       </div>
       <div class="card">
         <ol style="margin:0;padding-left:20px">
-          <li data-en="Search: type a word that was said (e.g. “nap”) and tap Search">검색: 대화에 나온 말(예: "낮잠")을 넣고 <b>찾기</b></li>
+          <li data-en="Search: type a word that was said, a child’s name or a tag (e.g. “nap”) and tap Search">검색: 대화에 나온 말·아이 이름·태그(예: "낮잠")를 넣고 <b>찾기</b></li>
+          <li data-en="Tags: tap a #tag under the buttons to see only those records">태그: 버튼 아래 <b>#태그</b>를 누르면 그 태그 기록만 보여요</li>
           <li data-en="Filter: tap Consultation / Meeting / Memo / Unassigned">고르기: <b>상담 · 회의 · 혼자 메모 · 미지정</b> 버튼</li>
           <li data-en="Listen: open a record and tap “Play from start”, or tap a time to play from there">듣기: 기록을 열고 <b>처음부터 듣기</b>, 또는 <b>시간</b>을 누르면 그 부분부터</li>
         </ol>
@@ -269,10 +273,24 @@ kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px sol
     </div>
   </section>
 
-  <!-- 5. 관리자 -->
+
+  <!-- 5. AI 요약 -->
+  <section class="chapter" id="summary">
+    <div class="chap-head"><span class="chap-num">5</span><h2 data-en="AI summary">AI 요약 보기</h2></div>
+    <p class="chap-lead" data-en="When a recording ends, the AI writes a summary, decisions, to-dos and tags by itself. Open the record to see it.">녹음을 끝내면 AI가 <b>요약 · 정한 것 · 할 일 · 태그</b>를 스스로 정리해요. 기록을 열면 맨 위에 보여요.</p>
+    <ol class="steps">
+      <li><div class="step-title" data-en="Tick to-dos">할 일 체크</div><p class="step-body" data-en="Tick a to-do when it is done. Open to-dos show on the board and in the admin page.">끝난 할 일은 네모를 눌러 체크해요. 남은 할 일은 게시판과 관리자 페이지에 표시돼요.</p></li>
+      <li><div class="step-title" data-en="Fix the summary">요약 고치기</div><p class="step-body" data-en="Tap “Edit summary” and change any line. Tags: tap × to remove, type to add.">틀린 부분은 <b>요약 고치기</b>로 고쳐요. 태그는 ×로 지우고, 칸에 써서 더해요.</p></li>
+      <li><div class="step-title" data-en="Who was it with?">누구와 한 건지</div><p class="step-body" data-en="Next to “With”, tap Choose people and pick the child or parent. The AI guesses too (marked “AI guess”).">"상대" 옆 <b>상대 고르기</b>를 눌러 아이나 학부모를 골라요. AI가 먼저 짐작해 둘 때도 있어요 ("AI 추정" 표시).</p></li>
+      <li><div class="step-title" data-en="Send it">보내기</div><p class="step-body" data-en="“Email summary” sends it to you. “Copy all text” now includes the summary as well.">"요약 메일 보내기"로 내 메일에 보내요. "글 전체 복사"에도 요약이 같이 들어가요.</p></li>
+    </ol>
+    <p class="note" data-en="The AI only tidies what was said. Always check important details against the recording.">AI는 말한 내용을 정리만 해요. 중요한 내용은 원래 녹음으로 꼭 확인해 주세요.</p>
+  </section>
+
+  <!-- 6. 관리자 -->
   <section class="chapter" id="admin">
-    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">5</span><h2><span data-en="Manage teachers">선생님 관리</span><span class="badge-admin" data-en="Admins">관리자</span></h2></div>
-    <p class="chap-lead" data-en="Open the ☰ menu at the top left → Teacher accounts. (Or the “Admin” card on the home screen.)">왼쪽 위 <b>☰ 메뉴</b> → <b>선생님 계정</b>을 눌러요. 홈 화면의 <b>관리자 페이지</b> 카드로도 들어갈 수 있어요.</p>
+    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">6</span><h2><span data-en="Manage teachers">선생님 관리</span><span class="badge-admin" data-en="Admins">관리자</span></h2></div>
+    <p class="chap-lead" data-en="☰ menu → Admin (or the Admin card on the home screen). The admin page has its own dark menu; “Back to app” returns you.">☰ 메뉴 → <b>관리자 페이지</b> (홈 화면의 관리자 카드로도 돼요). 관리자 화면은 메뉴가 따로 있고, <b>사용자 화면으로</b>를 누르면 돌아가요.</p>
     <ol class="steps">
       <li><div class="step-title" data-en="Approve requests">가입 신청 승인</div><p class="step-body" data-en="New requests show at the top with a number. Tap “Approve” and they can sign in.">새 신청은 맨 위에 숫자와 함께 떠요. <b>승인</b>을 누르면 바로 들어올 수 있어요.</p></li>
       <li><div class="step-title" data-en="Add a teacher yourself">직접 추가하기</div><p class="step-body" data-en="Scroll down to “Add account”: name, English name, position, phone, email. Set a password if you like and tell them.">아래 <b>계정 추가</b>에 이름·영어 이름·직책·전화번호·이메일을 넣어요. 비밀번호를 정해 주면 본인에게 알려 주세요.</p></li>
@@ -283,13 +301,27 @@ kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px sol
 
   <!-- 6. 메일 -->
   <section class="chapter" id="mail">
-    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">6</span><h2><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="badge-admin" data-en="Admins · once">관리자 · 한 번</span></h2></div>
+    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">7</span><h2><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="badge-admin" data-en="Admins · once">관리자 · 한 번</span></h2></div>
     <p class="chap-lead" data-en="Needed for “Sign in with an email code”. Uses a Gmail account; no domain needed.">"이메일 인증번호 로그인"을 쓰려면 한 번 해 두세요. Gmail 하나면 돼요.</p>
     <ol class="steps">
       <li><div class="step-title" data-en="Turn on 2-Step Verification for the Gmail account">Gmail에 2단계 인증 켜기</div><p class="step-body" data-en="Google account → Security → 2-Step Verification.">구글 계정 → <b>보안</b> → <b>2단계 인증</b>. 이미 켜져 있으면 건너뛰어요.</p></li>
       <li><div class="step-title" data-en="Make an app password">앱 비밀번호 만들기</div><p class="step-body"><span data-en="Open the page below, type “Jina Recorder” as the name, then Create.">아래 페이지를 열고 이름에 "지나기록기"를 넣고 <b>만들기</b>.</span><br><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" data-en="Open Google app passwords">구글 앱 비밀번호 열기</a></p></li>
       <li><div class="step-title" data-en="Paste it into Settings">설정에 붙여 넣기</div><p class="step-body" data-en="☰ menu → Settings → Email: choose Gmail, enter the Gmail address and the 16 characters → Save.">☰ 메뉴 → <b>설정</b> → <b>이메일 발송</b>: Gmail 고르기 → Gmail 주소와 16자리 넣기 → <b>저장</b>.</p></li>
       <li><div class="step-title" data-en="Send a test email">테스트 메일 보내기</div><p class="step-body" data-en="If it arrives, you’re done. The login screen now shows the email-code option.">메일이 오면 끝이에요. 로그인 화면에 인증번호 로그인이 나타나요.</p></li>
+    </ol>
+  </section>
+
+
+  <!-- 8. AI·분석·백업 -->
+  <section class="chapter" id="ai">
+    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">8</span><h2><span data-en="AI, insights &amp; backup">AI · 분석 · 백업</span><span class="badge-admin" data-en="Admins">관리자</span></h2></div>
+    <ol class="steps">
+      <li><div class="step-title" data-en="Choose the AI">AI 고르기</div><p class="step-body" data-en="Settings → AI. It works with no key (Cloudflare AI). For the most natural Korean, paste a Claude key and choose Claude for summaries.">설정 → <b>AI 연결</b>. 키 없이도 돌아가요 (Cloudflare AI). 한국어를 더 자연스럽게 하려면 Claude 키를 넣고 요약 AI를 <b>Claude</b>로 고르세요.</p></li>
+      <li><div class="step-title" data-en="Summary emails">요약 메일</div><p class="step-body" data-en="Settings → Email → Summary email: send each summary to the teacher, and add the director to “Also send to”.">설정 → 이메일 → <b>요약 메일</b>: 요약이 끝나면 선생님에게 자동으로 가요. <b>같이 받을 사람</b>에 원장님 메일을 넣으면 모든 요약을 같이 받아요. 메일 모양은 <b>메일 템플릿</b>에서 고쳐요.</p></li>
+      <li><div class="step-title" data-en="Insights">기록 분석</div><p class="step-body" data-en="See counts by teacher, top tags and open to-dos. “Analyse” has the AI read the period and list themes, children to watch and follow-ups.">선생님별 건수, 많이 나온 태그, 남은 할 일을 한눈에 봐요. <b>AI 분석 만들기</b>를 누르면 기간 전체 흐름·지켜볼 아이·챙길 일을 정리해 줘요.</p></li>
+      <li><div class="step-title" data-en="Children &amp; parents">원아·학부모</div><p class="step-body" data-en="Add children and parents once. Then recordings can be linked to them and “Records” shows all of that person’s records.">한 번 등록해 두면 녹음에 바로 연결하고, <b>기록 n건</b>을 눌러 그 사람 기록만 모아 봐요.</p></li>
+      <li><div class="step-title" data-en="Excel / NCMG">엑셀 · NCMG로 옮기기</div><p class="step-body" data-en="Insights → Export → Download CSV. It opens in Excel and can be pasted into NCMG.">기록 분석 → <b>내보내기</b> → CSV 받기. 엑셀에서 바로 열리고 NCMG에 붙여 넣을 수 있어요.</p></li>
+      <li><div class="step-title" data-en="Google Drive backup">구글 드라이브 백업</div><p class="step-body" data-en="Settings → Google Drive → Connect. Summaries, transcripts and the original audio are saved by date in a “지나기록기 백업” folder.">설정 → <b>구글 드라이브</b> → 연결. 요약·받아쓴 글·원래 녹음이 "지나기록기 백업" 폴더에 날짜별로 저장돼요.</p></li>
     </ol>
   </section>
 

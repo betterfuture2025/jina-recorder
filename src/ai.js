@@ -57,7 +57,15 @@ function cfText(out) {
 }
 
 // system, user 글을 주면 AI 답(글자)을 돌려준다
+// 로컬 시험용 가짜 AI (.dev.vars 에 AI_MOCK=1 일 때만). 실제 사이트에는 이 값이 없다.
+function mockAnswer(job, user) {
+  if (/연결 확인/.test(user)) return '연결됐어요';
+  if (job === 'analysis') return JSON.stringify({ overview: '이번 기간에는 적응과 낮잠 이야기가 가장 많았어요.', themes: [{ title: '낮잠 적응', detail: '하윤이 상담에서 낮잠 어려움이 나왔어요.' }], watch: [{ who: '하윤', detail: '금요일에 낮잠 상황을 다시 알리기로 했어요.' }], followups: ['금요일 하윤이 어머님 연락'], staff: [{ name: '김하늘', note: '상담 기록을 꼼꼼히 남겼어요.' }], suggestions: ['낮잠용 개인 담요 안내문 만들기'] });
+  return '```json\n' + JSON.stringify({ title: '하윤이 어머님 상담 — 낮잠 적응', summary: ['아침 등원 때 우는 시간이 크게 줄었음', '집에서 친구 이름을 자주 말함', '낮잠은 아직 힘들어함'], decisions: ['다음 주부터 낮잠용 담요를 집에서 가져오기로 함'], todos: ['금요일에 어머님께 낮잠 상황 다시 알리기'], tags: ['하윤', '적응', '#낮잠'], people: [{ name: '하윤', relation: '원아' }] }) + '\n```';
+}
+
 export async function chat(env, job, { system, user, maxTokens = 1500 }) {
+  if (env.AI_MOCK === '1') return { text: mockAnswer(job, user), provider: 'mock', model: 'mock', maxChars: 18000 };
   const cfg = await aiConfig(env, job);
   const { provider, model, s } = cfg;
   let text = '';

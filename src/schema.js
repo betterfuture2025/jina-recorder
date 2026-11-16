@@ -11,6 +11,11 @@ const COLUMNS = [
   ['users', 'password_hash', 'TEXT'],
   ['users', 'password_set_at', 'TEXT'],
   ['signup_requests', 'password_hash', 'TEXT'],
+  ['summaries', 'status', 'TEXT'],
+  ['summaries', 'error', 'TEXT'],
+  ['summaries', 'people', 'TEXT'],
+  ['summaries', 'provider', 'TEXT'],
+  ['summaries', 'emailed_at', 'TEXT'],
 ];
 
 let ready = null;

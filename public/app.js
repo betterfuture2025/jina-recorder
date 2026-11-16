@@ -454,6 +454,19 @@ function renderSetup(status) {
     </div>`;
   bindLang(app, () => renderSetup(status));
   app.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.dataset.copy, b)));
+  loadDrivePanel();
+  const dmsg = routeParams.get('drive');
+  if (dmsg) toast(t('drive_' + dmsg) || dmsg);
+  app.querySelectorAll('[data-act="test-ai"]').forEach((btn) => btn.addEventListener('click', async () => {
+    const out = btn.closest('form').querySelector('.test-result');
+    btn.disabled = true;
+    out.innerHTML = `<div class="notice">${esc(t('aiTesting'))}</div>`;
+    try {
+      const r = await api('/api/admin/ai-test', { method: 'POST', body: { job: btn.dataset.job } });
+      out.innerHTML = `<div class="notice ok" role="status">${esc(t('aiTestOk', { model: r.model, reply: r.reply }))}</div>`;
+    } catch (err) { out.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+    btn.disabled = false;
+  }));
 
   const form = app.querySelector('#setup-form');
   form.addEventListener('submit', async (e) => {
@@ -617,14 +630,18 @@ async function loadRecent() {
 function recCard(r) {
   const title = r.title || (r.kind === 'unassigned' ? t('untitled') : kindLabel(r.kind));
   const live = r.status === 'recording';
+  const text = r.summary_line || r.snippet;
   return `<li><a class="rec-card" href="#/r/${esc(r.id)}">
     <div class="rec-card-top">
       <span class="kind-badge kind-${esc(r.kind)}">${esc(kindLabel(r.kind))}</span>
+      ${r.people && r.people.length ? `<span class="rec-card-people">${ICONS.people}${esc(r.people.join(', '))}</span>` : ''}
       <span class="rec-card-when">${esc(fmtStamp(r.started_at))}</span>
     </div>
     <div class="rec-card-title">${esc(title)}</div>
-    ${r.snippet ? `<p class="rec-card-snippet">${esc(r.snippet)}</p>` : ''}
-    <div class="rec-card-meta">${live ? `<span class="live-dot"></span>${esc(t('stillRecording'))}` : esc(fmtDur(r.duration_sec))}${state.user.role === 'admin' && r.owner_email !== state.user.email ? ` · ${esc(r.owner_name || r.owner_email)}` : ''}</div>
+    ${text ? `<p class="rec-card-snippet ${r.summary_line ? 'is-summary' : ''}">${r.summary_line ? `<span class="ai-mark">${ICONS.spark}</span>` : ''}${esc(text)}</p>` : ''}
+    <div class="rec-card-meta">${live ? `<span class="live-dot"></span>${esc(t('stillRecording'))}` : esc(fmtDur(r.duration_sec))}${state.user.role === 'admin' && r.owner_email !== state.user.email ? ` · ${esc(r.owner_name || r.owner_email)}` : ''}
+      ${r.todo_open ? `<span class="todo-badge">${esc(t('todoOpen', { n: r.todo_open }))}</span>` : ''}
+      ${(r.tags || []).slice(0, 4).map((x) => `<span class="tag-mini">#${esc(x)}</span>`).join('')}</div>
   </a></li>`;
 }
 
@@ -632,6 +649,8 @@ function recCard(r) {
 
 let recordsFilter = '';
 let recordsQuery = '';
+let recordsTag = '';
+let recordsContact = null; // { id, name }
 async function pageRecords() {
   const filters = [['', 'all'], ['consult', 'kindConsult'], ['meeting', 'kindMeeting'], ['memo', 'kindMemo'], ['unassigned', 'unassigned']];
   app.innerHTML = shell('records', `
@@ -645,15 +664,27 @@ async function pageRecords() {
     <div class="chips" role="group" aria-label="${esc(t('recordsTitle'))}">
       ${filters.map(([k, key]) => `<button type="button" class="chip" data-filter="${k}" aria-pressed="${recordsFilter === k}">${esc(t(key))}</button>`).join('')}
     </div>
+    <div class="tag-row" id="tag-row"></div>
+    ${recordsContact ? `<p class="filter-note">${ICONS.people}<span>${esc(t('filterPerson', { name: recordsContact.name }))}</span><button type="button" class="link-btn" data-act="clear-contact">${esc(t('clearFilter'))}</button></p>` : ''}
     <div id="list"><p class="lead">${esc(t('loading'))}</p></div>`);
   bindCommon();
   app.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { recordsFilter = b.dataset.filter; pageRecords(); }));
   app.querySelector('#search').addEventListener('submit', (e) => { e.preventDefault(); recordsQuery = app.querySelector('#q').value.trim(); pageRecords(); });
+  const cc = app.querySelector('[data-act="clear-contact"]');
+  if (cc) cc.addEventListener('click', () => { recordsContact = null; pageRecords(); });
+  api('/api/tags').then(({ tags }) => {
+    const row = app.querySelector('#tag-row');
+    if (!row || !tags.length) return;
+    row.innerHTML = tags.slice(0, 14).map((x) => `<button type="button" class="tag-chip" data-tag="${esc(x.name)}" aria-pressed="${recordsTag === x.name}">#${esc(x.name)}</button>`).join('');
+    row.querySelectorAll('[data-tag]').forEach((b) => b.addEventListener('click', () => { recordsTag = recordsTag === b.dataset.tag ? '' : b.dataset.tag; pageRecords(); }));
+  }).catch(() => {});
   let items;
   try {
     const q = new URLSearchParams({ limit: '100' });
     if (recordsFilter) q.set('kind', recordsFilter);
     if (recordsQuery) q.set('q', recordsQuery);
+    if (recordsTag) q.set('tag', recordsTag);
+    if (recordsContact) q.set('contact', recordsContact.id);
     if (state.user.role === 'admin') q.set('all', '1');
     ({ items } = await api('/api/recordings?' + q));
   } catch (err) { return handleError(err); }
@@ -697,6 +728,202 @@ function highlight(nodes, q) {
   });
 }
 
+// ── 기록 상세: 상대방 (원아·학부모) ──
+function renderPeople(box, id, people) {
+  if (!box) return;
+  box.innerHTML = `
+    <span class="people-label">${ICONS.people}${esc(t('peopleLabel'))}</span>
+    ${people.map((p) => `<span class="person-chip">${esc(p.name)}${p.role === 'ai' ? `<em>${esc(t('aiGuess'))}</em>` : ''}</span>`).join('')}
+    <button type="button" class="link-btn" data-act="pick-people">${esc(people.length ? t('change') : t('pickPeople'))}</button>`;
+  box.querySelector('[data-act="pick-people"]').addEventListener('click', () => peopleSheet(id, people, (next) => renderPeople(box, id, next)));
+}
+
+async function peopleSheet(id, current, done) {
+  let all = [];
+  try { ({ contacts: all } = await api('/api/contacts')); } catch (err) { return toast(err.message); }
+  const chosen = new Set(current.map((p) => p.id));
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  const kindName = (k) => t({ child: 'ckChild', parent: 'ckParent', staff: 'ckStaff', customer: 'ckCustomer', other: 'ckOther' }[k] || 'ckOther');
+  const draw = (q = '') => {
+    const list = all.filter((c) => !q || c.name.includes(q) || (c.child_name || '').includes(q));
+    wrap.querySelector('.pick-list').innerHTML = list.length ? list.map((c) => `
+      <label class="pick-item"><input type="checkbox" value="${esc(c.id)}" ${chosen.has(c.id) ? 'checked' : ''}>
+        <span><b>${esc(c.name)}</b><small>${esc(kindName(c.kind))}${c.child_name ? ' · ' + esc(c.child_name) : ''}</small></span></label>`).join('')
+      : `<p class="lead">${esc(t('noContacts'))}</p>`;
+    wrap.querySelectorAll('.pick-item input').forEach((cb) => cb.addEventListener('change', () => { if (cb.checked) chosen.add(cb.value); else chosen.delete(cb.value); }));
+  };
+  wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(t('pickPeople'))}">
+    <h2>${esc(t('pickPeople'))}</h2>
+    <input type="search" class="pick-search" placeholder="${esc(t('searchName'))}">
+    <div class="pick-list"></div>
+    <form class="pick-add row">
+      <select name="kind"><option value="child">${esc(t('ckChild'))}</option><option value="parent">${esc(t('ckParent'))}</option><option value="other">${esc(t('ckOther'))}</option></select>
+      <input name="name" type="text" maxlength="60" placeholder="${esc(t('newPersonName'))}">
+      <button class="btn btn-quiet shrink" type="submit">${esc(t('add'))}</button>
+    </form>
+    <div class="row" style="margin-top:14px">
+      <button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
+      <button type="button" class="btn btn-primary" data-act="ok">${esc(t('save'))}</button>
+    </div></div>`;
+  document.body.appendChild(wrap);
+  draw();
+  const close = () => wrap.remove();
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  wrap.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  wrap.querySelector('.pick-search').addEventListener('input', (e) => draw(e.target.value.trim()));
+  wrap.querySelector('.pick-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    if (!f.name.trim()) return;
+    try { const { contact } = await api('/api/contacts', { method: 'POST', body: f }); all.unshift(contact); chosen.add(contact.id); e.target.reset(); draw(); }
+    catch (err) { toast(err.message); }
+  });
+  wrap.querySelector('[data-act="ok"]').addEventListener('click', async () => {
+    try { const { people } = await api(`/api/recordings/${id}/people`, { method: 'PUT', body: { contactIds: [...chosen] } }); close(); toast(t('saved')); done(people); }
+    catch (err) { toast(err.message); }
+  });
+}
+
+// ── 기록 상세: AI 요약 ──
+const autoTried = new Set();
+function renderSummary(box, id, data, { auto = false } = {}) {
+  if (!box) return;
+  const sm = data.summary;
+  const hasText = data.chunks.some((c) => c.status === 'done' && c.text);
+  const tags = data.tags || [];
+  const status = sm ? sm.status : 'none';
+  const head = (extra = '') => `<div class="section-head"><h2>${ICONS.spark}${esc(t('aiSummary'))}</h2>${extra}</div>`;
+
+  if (!hasText) { box.innerHTML = ''; return; }
+  if (data.recording.status === 'recording') { box.innerHTML = ''; return; }
+
+  const runSummary = async (force) => {
+    box.innerHTML = `${head()}<div class="sum-card sum-working"><img src="/jina/think.png" alt=""><div><b>${esc(t('summarizing'))}</b><p>${esc(t('summarizingBody'))}</p></div></div>`;
+    try {
+      const out = await api(`/api/recordings/${id}/summarize`, { method: 'POST', body: { force } });
+      data.summary = out.summary; data.tags = out.tags;
+      if (out.title && !data.recording.title) { data.recording.title = out.title; const te = app.querySelector('#rec-title'); if (te && !te.value) te.value = out.title; }
+      if (out.mailed && out.mailed.sent && out.mailed.sent.length) toast(t('sumMailed', { n: out.mailed.sent.length }));
+      try { const fresh = await api(`/api/recordings/${id}`); renderPeople(app.querySelector('#people-row'), id, fresh.people || []); } catch {}
+    } catch (err) {
+      data.summary = { status: 'failed', error: err.message };
+    }
+    renderSummary(box, id, data);
+    if (state.config.driveAuto && data.summary && data.summary.status === 'done') backupToDrive(id, null, true);
+  };
+
+  if (status === 'none' || status === 'working' && auto) {
+    if (auto && state.config.autoSummary && !autoTried.has(id)) { autoTried.add(id); return runSummary(false); }
+    box.innerHTML = `${head()}<div class="sum-card sum-empty"><p>${esc(t('sumNone'))}</p>
+      <button type="button" class="btn btn-primary" data-act="sum">${ICONS.spark}<span>${esc(t('sumMake'))}</span></button></div>`;
+    box.querySelector('[data-act="sum"]').addEventListener('click', () => runSummary(false));
+    return;
+  }
+  if (status === 'failed' || status === 'working') {
+    box.innerHTML = `${head()}<div class="sum-card sum-empty"><p class="notice error">${esc(sm.error || t('sumFailed'))}</p>
+      <button type="button" class="btn btn-primary" data-act="sum">${esc(t('retry'))}</button></div>`;
+    box.querySelector('[data-act="sum"]').addEventListener('click', () => runSummary(true));
+    return;
+  }
+  if (status === 'empty') { box.innerHTML = `${head()}<p class="lead">${esc(t('sumEmpty'))}</p>`; return; }
+
+  const list = (title, items) => items.length ? `<h3>${esc(title)}</h3><ul class="sum-list">${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+  box.innerHTML = `${head(`<button type="button" class="link-btn" data-act="resum">${esc(t('sumRedo'))}</button>`)}
+    <div class="sum-card">
+      ${list(t('sumSummary'), sm.summary)}
+      ${list(t('sumDecisions'), sm.decisions)}
+      ${sm.todos.length ? `<h3>${esc(t('sumTodos'))}</h3><div class="todo-list">${sm.todos.map((x, i) => `
+        <label class="todo"><input type="checkbox" data-todo="${i}" ${x.done ? 'checked' : ''}><span>${esc(x.text)}</span></label>`).join('')}</div>` : ''}
+      <div class="tag-edit" id="tag-edit"></div>
+      <div class="sum-foot">${esc(sm.edited ? t('sumEdited') : t('sumBy', { model: sm.provider === 'anthropic' ? 'Claude' : sm.provider === 'openai' ? (sm.model || 'AI') : 'Cloudflare AI' }))}${sm.emailed_at ? ' · ' + esc(t('sumWasMailed')) : ''}</div>
+    </div>
+    <div class="sum-actions">
+      <button type="button" class="btn btn-quiet" data-act="edit">${esc(t('sumEdit'))}</button>
+      ${state.config.emailReady ? `<button type="button" class="btn btn-quiet" data-act="mail">${ICONS.mail}<span>${esc(t('sumMail'))}</span></button>` : ''}
+      ${state.config.driveReady ? `<button type="button" class="btn btn-quiet" data-act="drive">${esc(t('driveBackupOne'))}</button>` : ''}
+    </div>`;
+  renderTagEdit(box.querySelector('#tag-edit'), id, data);
+  box.querySelector('[data-act="resum"]').addEventListener('click', () => { if (confirm(t('sumRedoConfirm'))) runSummary(true); });
+  box.querySelectorAll('[data-todo]').forEach((cb) => cb.addEventListener('change', async () => {
+    const todos = sm.todos.map((x, i) => ({ ...x, done: i === Number(cb.dataset.todo) ? cb.checked : x.done }));
+    try { const out = await api(`/api/recordings/${id}/summary`, { method: 'PUT', body: { todos } }); data.summary = out.summary; sm.todos = out.summary.todos; }
+    catch (err) { toast(err.message); cb.checked = !cb.checked; }
+  }));
+  box.querySelector('[data-act="edit"]').addEventListener('click', () => summaryEditSheet(id, data, () => renderSummary(box, id, data)));
+  const mb = box.querySelector('[data-act="mail"]');
+  if (mb) mb.addEventListener('click', async () => {
+    mb.disabled = true;
+    try { const r = await api(`/api/recordings/${id}/mail`, { method: 'POST' }); toast(t('sumMailed', { n: (r.sent || []).length })); }
+    catch (err) { toast(err.message); }
+    mb.disabled = false;
+  });
+  const db = box.querySelector('[data-act="drive"]');
+  if (db) db.addEventListener('click', () => backupToDrive(id, db));
+}
+
+function renderTagEdit(box, id, data) {
+  const tags = (data.tags || []).map((x) => x.name);
+  box.innerHTML = `${tags.map((x, i) => `<span class="tag-chip is-static">#${esc(x)}<button type="button" data-rm="${i}" aria-label="${esc(t('removeTag', { tag: x }))}">×</button></span>`).join('')}
+    <form class="tag-add"><input type="text" maxlength="20" placeholder="${esc(t('addTag'))}" aria-label="${esc(t('addTag'))}"></form>`;
+  const save = async (next) => {
+    try { const out = await api(`/api/recordings/${id}/tags`, { method: 'PUT', body: { tags: next } }); data.tags = out.tags; renderTagEdit(box, id, data); }
+    catch (err) { toast(err.message); }
+  };
+  box.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => save(tags.filter((_, i) => i !== Number(b.dataset.rm)))));
+  box.querySelector('.tag-add').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = e.target.querySelector('input').value.trim().replace(/^#/, '');
+    if (v) save([...tags, v]);
+  });
+}
+
+function summaryEditSheet(id, data, done) {
+  const sm = data.summary;
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  const area = (name, label, items) => `<label class="field"><span>${esc(label)}</span><textarea name="${name}" rows="4">${esc(items.join('\n'))}</textarea></label>`;
+  wrap.innerHTML = `<form class="sheet" role="dialog" aria-modal="true" aria-label="${esc(t('sumEdit'))}">
+    <h2>${esc(t('sumEdit'))}</h2><p class="lead" style="margin-bottom:12px">${esc(t('sumEditHelp'))}</p>
+    ${area('summary', t('sumSummary'), sm.summary)}
+    ${area('decisions', t('sumDecisions'), sm.decisions)}
+    ${area('todos', t('sumTodos'), sm.todos.map((x) => x.text))}
+    <div class="row"><button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
+      <button type="submit" class="btn btn-primary">${esc(t('save'))}</button></div></form>`;
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  wrap.querySelector('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const lines = (v) => String(v || '').split('\n').map((x) => x.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+    const oldDone = new Map(sm.todos.map((x) => [x.text, x.done]));
+    try {
+      const out = await api(`/api/recordings/${id}/summary`, { method: 'PUT', body: {
+        summary: lines(f.summary), decisions: lines(f.decisions), todos: lines(f.todos).map((text) => ({ text, done: !!oldDone.get(text) })),
+      } });
+      data.summary = out.summary; close(); toast(t('saved')); done();
+    } catch (err) { toast(err.message); }
+  });
+}
+
+// ── 구글 드라이브 백업 (한 기록) ──
+async function backupToDrive(id, btn, quiet = false) {
+  const label = btn && btn.querySelector('span') ? btn.querySelector('span') : btn;
+  const old = label ? label.textContent : '';
+  if (btn) btn.disabled = true;
+  try {
+    let step = { from: 0 }, out;
+    do {
+      out = await api(`/api/recordings/${id}/drive`, { method: 'POST', body: { from: step.from, folderId: step.folderId } });
+      step = { from: out.next, folderId: out.folderId };
+      if (label) label.textContent = t('driveProgress', { n: out.next, total: out.total });
+    } while (!out.done);
+    if (!quiet) toast(t('driveDone'));
+  } catch (err) { if (!quiet) toast(err.message); }
+  if (btn) { btn.disabled = false; if (label) label.textContent = old; }
+}
+
 // ── 기록 상세 ─────────────────────────────────────────────
 
 async function pageRecordDetail(id) {
@@ -726,12 +953,15 @@ async function pageRecordDetail(id) {
     </div>
     ${r.kind === 'consult' ? `<label class="consent-row"><input type="checkbox" id="consent" ${r.consent ? 'checked' : ''}> <span>${esc(t('consentDone'))}</span></label>` : ''}
     ${r.status === 'recording' ? `<div class="notice warn">${esc(t('detailStillRecording'))}</div>` : ''}
+    <div class="people-row" id="people-row"></div>
 
     <div class="player">
       <button type="button" class="btn btn-primary" data-act="play-all" ${chunks.length ? '' : 'disabled'}>${ICONS.play}<span>${esc(t('playAll'))}</span></button>
       <span class="player-status" aria-live="polite"></span>
       <audio id="player" preload="none"></audio>
     </div>
+
+    <section class="section summary-sec" id="summary-box"></section>
 
     <section class="section">
       <div class="section-head"><h2>${esc(t('transcript'))}</h2>
@@ -790,6 +1020,13 @@ async function pageRecordDetail(id) {
       `${t('expKind')}: ${kindLabel(r.kind)}`,
       `${t('expBy')}: ${r.owner_name || r.owner_email || ''}`,
     ];
+    const sm = data.summary && data.summary.status === 'done' ? data.summary : null;
+    if (sm) {
+      if (sm.summary.length) head.push('', `[${t('sumSummary')}]`, ...sm.summary.map((x) => '- ' + x));
+      if (sm.decisions.length) head.push('', `[${t('sumDecisions')}]`, ...sm.decisions.map((x) => '- ' + x));
+      if (sm.todos.length) head.push('', `[${t('sumTodos')}]`, ...sm.todos.map((x) => `${x.done ? '[x]' : '[ ]'} ${x.text}`));
+      head.push('', `[${t('transcript')}]`);
+    }
     const body = chunks.filter((c) => c.status === 'done' && c.text)
       .map((c) => (withTimes ? `[${fmtClock(c.start_ms || 0)}] ` : '') + c.text.trim());
     return { title, text: head.join('\n') + '\n\n' + body.join(withTimes ? '\n' : '\n\n') + '\n' };
@@ -831,6 +1068,8 @@ async function pageRecordDetail(id) {
     catch (err) { toast(err.message); }
     pageRecordDetail(id);
   });
+  renderPeople(app.querySelector('#people-row'), id, data.people || []);
+  renderSummary(app.querySelector('#summary-box'), id, data, { auto: true });
   app.querySelector('[data-act="delete"]').addEventListener('click', async () => {
     if (!confirm(t('confirmDeleteRecording'))) return;
     try { await api(`/api/recordings/${id}`, { method: 'DELETE' }); toast(t('deleted')); location.hash = '#/records'; }
@@ -1010,14 +1249,185 @@ async function finishRecording(btn) {
 }
 
 
-// 파트 3·7 화면 (곧 채움)
-function pageSoon(section, titleKey, part) {
-  app.innerHTML = shell('admin:' + section, `<h2 class="page-title">${esc(t(titleKey))}</h2>
-    <div class="panel is-later"><h2>${esc(t(titleKey))}<span class="later-chip">${esc(t('comingInPart', { n: part }))}</span></h2></div>`);
+// ── 관리: 기록 분석 (파트 7) + 내보내기 (파트 8) ──────────────
+let insightDays = 30;
+async function pageInsights() {
+  app.innerHTML = shell('admin:insights', `<h2 class="page-title">${esc(t('adminInsights'))}</h2><p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
+  let d;
+  try { d = await api(`/api/admin/insights?days=${insightDays}`); } catch (err) { return handleError(err); }
+  const kinds = ['consult', 'meeting', 'memo', 'unassigned'];
+  const maxT = Math.max(1, ...d.teachers.map((x) => x.count));
+  app.querySelector('main').innerHTML = `
+    <div class="page-head wide">
+      <div><h2 class="page-title">${esc(t('adminInsights'))}</h2><p class="lead">${esc(t('insightsLead'))}</p></div>
+      <div class="chips" role="group" aria-label="${esc(t('period'))}">
+        ${[7, 30, 90].map((n) => `<button type="button" class="chip" data-days="${n}" aria-pressed="${insightDays === n}">${esc(t('lastDays', { n }))}</button>`).join('')}
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b>${d.total}</b><span>${esc(t('statRecords'))}</span></div>
+      <div class="stat"><b>${d.minutes}</b><span>${esc(t('statMinutes'))}</span></div>
+      ${kinds.map((k) => `<div class="stat"><b>${d.byKind[k] || 0}</b><span>${esc(kindLabel(k))}</span></div>`).join('')}
+    </div>
+    <div class="grid-2">
+      <section class="panel">
+        <h2>${esc(t('byTeacher'))}</h2>
+        ${d.teachers.length ? `<ul class="bars">${d.teachers.map((x) => `<li><span class="bar-name">${esc(x.name)}</span>
+          <span class="bar"><i style="width:${Math.round((x.count / maxT) * 100)}%"></i></span><span class="bar-n">${x.count}${esc(t('countUnit'))} · ${x.minutes}${esc(t('minUnit'))}</span></li>`).join('')}</ul>` : `<p class="desc">${esc(t('noData'))}</p>`}
+      </section>
+      <section class="panel">
+        <h2>${esc(t('topTags'))}</h2>
+        ${d.tags.length ? `<div class="tag-row">${d.tags.map((x) => `<a class="tag-chip" href="#/records" data-goto-tag="${esc(x.name)}">#${esc(x.name)} <small>${x.n}</small></a>`).join('')}</div>` : `<p class="desc">${esc(t('noData'))}</p>`}
+      </section>
+    </div>
+    <section class="panel">
+      <h2>${esc(t('openTodos'))} <span class="count-chip">${d.openTodos.length}</span></h2>
+      ${d.openTodos.length ? `<ul class="todo-admin">${d.openTodos.map((x) => `<li><a href="#/r/${esc(x.id)}"><span class="todo-text">${esc(x.text)}</span>
+        <small>${esc(x.title)} · ${esc(x.owner)} · ${esc(fmtStamp(x.at, { time: false }))}</small></a></li>`).join('')}</ul>` : `<p class="desc">${esc(t('noOpenTodos'))}</p>`}
+    </section>
+    <section class="panel ai-panel">
+      <div class="section-head"><h2>${ICONS.spark}${esc(t('aiAnalysis'))}</h2>
+        ${d.latest ? `<small class="desc">${esc(t('analysisAt', { when: fmtStamp(d.latest.created_at), n: d.latest.record_count, days: d.latest.days }))}</small>` : ''}</div>
+      ${d.unsummarized ? `<div class="notice warn">${esc(t('unsummarizedNote', { n: d.unsummarized }))}
+        <button type="button" class="btn btn-quiet btn-small" data-act="sum-all">${esc(t('sumAll'))}</button><span class="sum-all-prog"></span></div>` : ''}
+      <div id="analysis">${d.latest && d.latest.body ? analysisHtml(d.latest.body) : `<p class="desc">${esc(t('analysisNone'))}</p>`}</div>
+      <button type="button" class="btn btn-primary" data-act="analyze">${ICONS.spark}<span>${esc(t('analysisRun', { n: insightDays }))}</span></button>
+    </section>
+    <section class="panel">
+      <h2>${esc(t('exportTitle'))}</h2>
+      <p class="desc">${esc(t('exportDesc'))}</p>
+      <label class="check-row"><input type="checkbox" id="exp-text" checked> <span>${esc(t('exportWithText'))}</span></label>
+      <label class="check-row"><input type="checkbox" id="exp-mark"> <span>${esc(t('exportMark'))}</span></label>
+      <a class="btn btn-quiet" id="exp-link" href="#">${ICONS.download}<span>${esc(t('exportButton', { n: insightDays }))}</span></a>
+    </section>`;
+  app.querySelectorAll('[data-days]').forEach((b) => b.addEventListener('click', () => { insightDays = Number(b.dataset.days); pageInsights(); }));
+  app.querySelectorAll('[data-goto-tag]').forEach((a) => a.addEventListener('click', () => { recordsTag = a.dataset.gotoTag; recordsFilter = ''; recordsQuery = ''; recordsContact = null; }));
+  const expLink = app.querySelector('#exp-link');
+  const syncExp = () => { expLink.href = `/api/admin/export.csv?days=${insightDays}&text=${app.querySelector('#exp-text').checked ? 1 : 0}&mark=${app.querySelector('#exp-mark').checked ? 1 : 0}`; };
+  app.querySelectorAll('#exp-text, #exp-mark').forEach((x) => x.addEventListener('change', syncExp)); syncExp();
+  const sumAll = app.querySelector('[data-act="sum-all"]');
+  if (sumAll) sumAll.addEventListener('click', async () => {
+    sumAll.disabled = true;
+    const prog = app.querySelector('.sum-all-prog');
+    try {
+      const { ids } = await api(`/api/admin/unsummarized?days=${insightDays}`);
+      for (let i = 0; i < ids.length; i++) {
+        prog.textContent = ' ' + t('progress', { n: i + 1, total: ids.length });
+        try { await api(`/api/recordings/${ids[i]}/summarize`, { method: 'POST', body: {} }); } catch {}
+      }
+    } catch (err) { toast(err.message); }
+    pageInsights();
+  });
+  app.querySelector('[data-act="analyze"]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true;
+    const box = app.querySelector('#analysis');
+    box.innerHTML = `<div class="sum-card sum-working"><img src="/jina/think.png" alt=""><div><b>${esc(t('analyzing'))}</b><p>${esc(t('analyzingBody'))}</p></div></div>`;
+    try { const { insight } = await api('/api/admin/insights', { method: 'POST', body: { days: insightDays } }); box.innerHTML = analysisHtml(insight.body); }
+    catch (err) { box.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+    btn.disabled = false;
+  });
 }
-function pageInsights() { return pageSoon('insights', 'adminInsights', 7); }
-function pageContacts() { return pageSoon('contacts', 'adminContacts', 3); }
+
+function analysisHtml(b) {
+  const sec = (title, inner) => inner ? `<h3>${esc(title)}</h3>${inner}` : '';
+  const ul = (arr, fn) => arr && arr.length ? `<ul class="sum-list">${arr.map(fn).join('')}</ul>` : '';
+  return `<div class="analysis">
+    ${b.overview ? `<p class="overview">${esc(b.overview)}</p>` : ''}
+    ${sec(t('anThemes'), ul(b.themes, (x) => `<li><b>${esc(x.title)}</b> — ${esc(x.detail)}</li>`))}
+    ${sec(t('anWatch'), ul(b.watch, (x) => `<li><b>${esc(x.who)}</b> — ${esc(x.detail)}</li>`))}
+    ${sec(t('anFollowups'), ul(b.followups, (x) => `<li>${esc(x)}</li>`))}
+    ${sec(t('anStaff'), ul(b.staff, (x) => `<li><b>${esc(x.name)}</b> — ${esc(x.note)}</li>`))}
+    ${sec(t('anSuggestions'), ul(b.suggestions, (x) => `<li>${esc(x)}</li>`))}
+    <p class="sum-foot">${esc(t('anNote'))}</p></div>`;
+}
+
+// ── 관리: 원아·학부모 (파트 3) ───────────────────────────────
+let contactsQuery = '';
+async function pageContacts() {
+  app.innerHTML = shell('admin:contacts', `<h2 class="page-title">${esc(t('adminContacts'))}</h2><p class="lead">${esc(t('loading'))}</p>`);
+  bindCommon();
+  let contacts;
+  try { ({ contacts } = await api('/api/contacts' + (contactsQuery ? '?q=' + encodeURIComponent(contactsQuery) : ''))); } catch (err) { return handleError(err); }
+  const kindName = (k) => t({ child: 'ckChild', parent: 'ckParent', staff: 'ckStaff', customer: 'ckCustomer', other: 'ckOther' }[k] || 'ckOther');
+  const children = contacts.filter((c) => c.kind === 'child');
+  const childOpts = (sel) => `<option value="">${esc(t('noChildLink'))}</option>` + children.map((c) => `<option value="${esc(c.id)}" ${sel === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  app.querySelector('main').innerHTML = `
+    <h2 class="page-title">${esc(t('adminContacts'))}</h2>
+    <p class="lead">${esc(t('contactsLead'))}</p>
+    <form class="search" id="c-search" role="search">${ICONS.search}
+      <input type="search" name="q" value="${esc(contactsQuery)}" placeholder="${esc(t('searchName'))}">
+      <button type="submit" class="btn btn-primary btn-small">${esc(t('searchButton'))}</button></form>
+    ${contacts.length ? `<ul class="contact-list">${contacts.map((c) => `
+      <li class="contact-item">
+        <span class="avatar" aria-hidden="true">${esc(c.name.charAt(0))}</span>
+        <div class="contact-main"><b>${esc(c.name)}</b> <span class="kind-mini">${esc(kindName(c.kind))}${c.relation ? ' · ' + esc(c.relation) : ''}</span>
+          <small>${[c.child_name ? t('childOf', { name: c.child_name }) : '', c.phone, c.email].filter(Boolean).map(esc).join(' · ')}</small>
+          ${c.note ? `<small class="muted">${esc(c.note)}</small>` : ''}</div>
+        <div class="contact-actions">
+          ${c.record_count ? `<button type="button" class="btn btn-quiet btn-small" data-records="${esc(c.id)}" data-name="${esc(c.name)}">${esc(t('recordsN', { n: c.record_count }))}</button>` : ''}
+          <button type="button" class="btn btn-quiet btn-small" data-edit="${esc(c.id)}">${esc(t('editInfo'))}</button>
+        </div>
+      </li>`).join('')}</ul>` : `<p class="desc">${esc(t('noContacts'))}</p>`}
+    <form class="panel" id="c-add">
+      <h2>${esc(t('addContact'))}</h2>
+      <div class="row">
+        <label class="field shrink"><span>${esc(t('ckKind'))}</span><select name="kind">
+          ${['child', 'parent', 'staff', 'customer', 'other'].map((k) => `<option value="${k}">${esc(kindName(k))}</option>`).join('')}</select></label>
+        <label class="field"><span>${esc(t('ckName'))}</span><input name="name" type="text" maxlength="60" required></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>${esc(t('ckRelation'))}</span><input name="relation" type="text" maxlength="30" placeholder="${esc(t('ckRelationPh'))}"></label>
+        <label class="field"><span>${esc(t('ckChildLink'))}</span><select name="related_child_id">${childOpts('')}</select></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>${esc(t('phone'))}</span><input name="phone" type="tel" maxlength="30"></label>
+        <label class="field"><span>${esc(t('emailLabel'))}</span><input name="email" type="email" maxlength="120"></label>
+      </div>
+      <label class="field"><span>${esc(t('ckNote'))}</span><input name="note" type="text" maxlength="500" placeholder="${esc(t('ckNotePh'))}"></label>
+      <button class="btn btn-primary" type="submit">${esc(t('add'))}</button>
+    </form>`;
+  app.querySelector('#c-search').addEventListener('submit', (e) => { e.preventDefault(); contactsQuery = e.target.q.value.trim(); pageContacts(); });
+  app.querySelector('#c-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try { await api('/api/contacts', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); toast(t('saved')); pageContacts(); }
+    catch (err) { toast(err.message); }
+  });
+  app.querySelectorAll('[data-records]').forEach((b) => b.addEventListener('click', () => {
+    recordsContact = { id: b.dataset.records, name: b.dataset.name }; recordsFilter = ''; recordsQuery = ''; recordsTag = '';
+    location.hash = '#/records';
+  }));
+  app.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+    const c = contacts.find((x) => x.id === b.dataset.edit);
+    const wrap = document.createElement('div');
+    wrap.className = 'sheet-wrap';
+    wrap.innerHTML = `<form class="sheet" role="dialog" aria-modal="true" aria-label="${esc(c.name)}">
+      <h2>${esc(c.name)}</h2>
+      <div class="row"><label class="field shrink"><span>${esc(t('ckKind'))}</span><select name="kind">
+        ${['child', 'parent', 'staff', 'customer', 'other'].map((k) => `<option value="${k}" ${c.kind === k ? 'selected' : ''}>${esc(kindName(k))}</option>`).join('')}</select></label>
+        <label class="field"><span>${esc(t('ckName'))}</span><input name="name" type="text" value="${esc(c.name)}" required></label></div>
+      <div class="row"><label class="field"><span>${esc(t('ckRelation'))}</span><input name="relation" type="text" value="${esc(c.relation || '')}"></label>
+        <label class="field"><span>${esc(t('ckChildLink'))}</span><select name="related_child_id">${childOpts(c.related_child_id)}</select></label></div>
+      <div class="row"><label class="field"><span>${esc(t('phone'))}</span><input name="phone" type="tel" value="${esc(c.phone || '')}"></label>
+        <label class="field"><span>${esc(t('emailLabel'))}</span><input name="email" type="email" value="${esc(c.email || '')}"></label></div>
+      <label class="field"><span>${esc(t('ckNote'))}</span><input name="note" type="text" value="${esc(c.note || '')}"></label>
+      <div class="row"><button type="button" class="btn btn-danger shrink" data-act="del">${esc(t('delete'))}</button>
+        <button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
+        <button type="submit" class="btn btn-primary">${esc(t('save'))}</button></div></form>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    wrap.querySelector('[data-act="del"]').addEventListener('click', async () => {
+      if (!confirm(t('confirmDeleteContact', { name: c.name }))) return;
+      try { await api(`/api/contacts/${c.id}`, { method: 'DELETE' }); close(); pageContacts(); } catch (err) { toast(err.message); }
+    });
+    wrap.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try { await api(`/api/contacts/${c.id}`, { method: 'PATCH', body: Object.fromEntries(new FormData(e.target)) }); close(); toast(t('saved')); pageContacts(); }
+      catch (err) { toast(err.message); }
+    });
+  }));
+}
 
 // ── 관리: 메일 템플릿 ─────────────────────────────────────
 
@@ -1280,6 +1690,8 @@ async function pageSettings() {
   catch (err) { return handleError(err); }
   const s = data.settings;
 
+  const provSelect = (name) => `<select name="${name}">${[['cf', 'Cloudflare AI'], ['anthropic', 'Claude'], ['openai', t('aiOther')]]
+    .map(([v, l]) => `<option value="${v}" ${(s[name].value || 'cf') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   const later = (title, desc, part) => `
     <div class="panel is-later"><h2>${esc(title)}<span class="later-chip">${t('comingInPart', { n: part })}</span></h2>
     <p class="desc">${esc(desc)}</p></div>`;
@@ -1312,7 +1724,55 @@ async function pageSettings() {
       </div>
     </form>
 
-    ${later(t('secAI'), t('secAIDesc'), 6)}
+
+    <form class="panel" data-section="ai">
+      <h2>${ICONS.spark}${esc(t('secAI'))}</h2>
+      <p class="desc">${esc(t('aiDesc'))}</p>
+      <div class="row ai-pick">
+        <label class="field"><span>${esc(t('aiForSummary'))}</span>${provSelect('ai.summary_provider')}</label>
+        <label class="field"><span>${esc(t('aiForAnalysis'))}</span>${provSelect('ai.analysis_provider')}</label>
+      </div>
+      <label class="check-row"><input type="hidden" name="ai.auto_summary" value="0"><input type="checkbox" name="ai.auto_summary" value="1" ${s['ai.auto_summary'].value !== '0' ? 'checked' : ''}> <span>${esc(t('aiAuto'))}</span></label>
+
+      <details class="ai-box" ${['ai.summary_provider', 'ai.analysis_provider'].some((k) => (s[k].value || 'cf') === 'cf') ? 'open' : ''}>
+        <summary><b>Cloudflare AI</b> · ${esc(t('aiCfShort'))}</summary>
+        <label class="field"><span>${esc(t('aiModel'))}</span>
+          <input name="ai.cf_model" type="text" list="cf-models" spellcheck="false" placeholder="@cf/meta/llama-3.3-70b-instruct-fp8-fast" value="${esc(s['ai.cf_model'].value)}">
+          <small>${esc(t('aiCfHelp'))}</small></label>
+        <datalist id="cf-models">
+          <option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast"><option value="@cf/qwen/qwen3-30b-a3b-fp8">
+          <option value="@cf/meta/llama-4-scout-17b-16e-instruct"><option value="@cf/mistralai/mistral-small-3.1-24b-instruct">
+        </datalist>
+      </details>
+      <details class="ai-box" ${['ai.summary_provider', 'ai.analysis_provider'].some((k) => s[k].value === 'anthropic') ? 'open' : ''}>
+        <summary><b>Claude</b> · ${esc(t('aiClaudeShort'))}</summary>
+        <ol class="steps">${t('aiClaudeSteps').map((x) => `<li>${x}</li>`).join('')}</ol>
+        <label class="field"><span>${esc(t('aiKey'))}</span>
+          <input name="ai.anthropic_key" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(s['ai.anthropic_key'].set ? t('secretPlaceholder') : 'sk-ant-...')}">
+          ${s['ai.anthropic_key'].set ? `<small>${t('secretSet', { hint: s['ai.anthropic_key'].hint })}</small>` : ''}</label>
+        <label class="field"><span>${esc(t('aiModel'))}</span>
+          <select name="ai.anthropic_model">
+            ${[['claude-haiku-5-5', t('aiHaiku')], ['claude-sonnet-5-5', t('aiSonnet')], ['claude-opus-5-5', t('aiOpus')]].map(([v, l]) => `<option value="${v}" ${(s['ai.anthropic_model'].value || 'claude-haiku-5-5') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+          </select></label>
+      </details>
+      <details class="ai-box" ${['ai.summary_provider', 'ai.analysis_provider'].some((k) => s[k].value === 'openai') ? 'open' : ''}>
+        <summary><b>${esc(t('aiOther'))}</b> · Qwen · OpenAI · DeepSeek</summary>
+        <p class="desc">${t('aiOtherHelp')}</p>
+        <label class="field"><span>${esc(t('aiBase'))}</span>
+          <input name="ai.openai_base" type="url" spellcheck="false" placeholder="https://dashscope-intl.aliyuncs.com/compatible-mode/v1" value="${esc(s['ai.openai_base'].value)}"></label>
+        <label class="field"><span>${esc(t('aiKey'))}</span>
+          <input name="ai.openai_key" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(s['ai.openai_key'].set ? t('secretPlaceholder') : 'sk-...')}">
+          ${s['ai.openai_key'].set ? `<small>${t('secretSet', { hint: s['ai.openai_key'].hint })}</small>` : ''}</label>
+        <label class="field"><span>${esc(t('aiModel'))}</span>
+          <input name="ai.openai_model" type="text" spellcheck="false" placeholder="qwen-plus" value="${esc(s['ai.openai_model'].value)}"></label>
+      </details>
+      <div class="test-result"></div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn btn-primary shrink" type="submit">${esc(t('save'))}</button>
+        <button class="btn btn-quiet shrink" type="button" data-act="test-ai" data-job="summary">${esc(t('aiTestSummary'))}</button>
+        <button class="btn btn-quiet shrink" type="button" data-act="test-ai" data-job="analysis">${esc(t('aiTestAnalysis'))}</button>
+      </div>
+    </form>
     <form class="panel" data-section="email">
       <h2>${esc(t('secEmail'))}</h2>
       <p class="desc">${esc(t('secEmailDesc2'))}</p>
@@ -1338,13 +1798,26 @@ async function pageSettings() {
         <input name="email.from" type="text" spellcheck="false" autocomplete="off" placeholder="지나기록기 &lt;noreply@도메인&gt;" value="${esc(s['email.from'].value)}">
         <small>${esc(t('mailFromHelp'))}</small></label>
       </div>
+      <div class="sub-block">
+        <h3>${esc(t('sumMailTitle'))}</h3>
+        <label class="check-row"><input type="hidden" name="mail.summary_auto" value="0"><input type="checkbox" name="mail.summary_auto" value="1" ${s['mail.summary_auto'].value !== '0' ? 'checked' : ''}> <span>${esc(t('sumMailAuto'))}</span></label>
+        <label class="field"><span>${esc(t('sumMailCc'))}</span>
+          <input name="mail.summary_cc" type="text" spellcheck="false" placeholder="director@example.com, ..." value="${esc(s['mail.summary_cc'].value)}">
+          <small>${esc(t('sumMailCcHelp'))}</small></label>
+        <p class="desc"><a href="#/admin/mail/summary">${esc(t('sumMailTemplateLink'))}</a></p>
+      </div>
       <div class="test-result"></div>
       <div class="row" style="flex-wrap:wrap">
         <button class="btn btn-primary shrink" type="submit">${esc(t('save'))}</button>
         <button class="btn btn-quiet shrink" type="button" data-act="test-mail">${esc(t('sendTestMail'))}</button>
       </div>
     </form>
-    ${later(t('secDrive'), t('secDriveDesc'), 8)}`;
+
+    <form class="panel" data-section="drive" id="drive-panel">
+      <h2>${esc(t('secDrive'))}</h2>
+      <p class="desc">${esc(t('driveDesc'))}</p>
+      <div data-drive-status><p class="lead">${esc(t('loading'))}</p></div>
+    </form>`;
 
   app.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.dataset.copy, b)));
 
@@ -1390,6 +1863,48 @@ async function pageSettings() {
       out.innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
     }
     e.target.disabled = false;
+  });
+}
+
+async function loadDrivePanel() {
+  const box = app.querySelector('[data-drive-status]');
+  if (!box) return;
+  let d;
+  try { d = await api('/api/admin/drive'); } catch (err) { box.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; return; }
+  if (!d.connected) {
+    box.innerHTML = `
+      <ol class="steps">${t('driveSteps').map((x) => `<li>${x}</li>`).join('')}</ol>
+      <a class="btn btn-primary" href="/auth/drive">${esc(t('driveConnect'))}</a>`;
+    return;
+  }
+  const left = d.total - d.backedUp;
+  box.innerHTML = `
+    <div class="notice ok">${esc(t('driveConnected', { account: d.account || '' }))}</div>
+    <label class="check-row"><input type="hidden" name="drive.auto" value="0"><input type="checkbox" name="drive.auto" value="1" ${d.auto ? 'checked' : ''}> <span>${esc(t('driveAuto'))}</span></label>
+    <p class="desc">${esc(t('driveCount', { done: d.backedUp, total: d.total }))}</p>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn btn-primary shrink" type="submit">${esc(t('save'))}</button>
+      ${left ? `<button class="btn btn-quiet shrink" type="button" data-act="drive-all">${esc(t('driveAll', { n: left }))}</button>` : ''}
+      <button class="btn btn-quiet shrink" type="button" data-act="drive-off">${esc(t('driveDisconnect'))}</button>
+    </div>
+    <p class="desc drive-progress" aria-live="polite"></p>`;
+  const all = box.querySelector('[data-act="drive-all"]');
+  if (all) all.addEventListener('click', async () => {
+    all.disabled = true;
+    const prog = box.querySelector('.drive-progress');
+    try {
+      const { items } = await api('/api/admin/drive/pending');
+      for (let i = 0; i < items.length; i++) {
+        prog.textContent = t('driveAllProgress', { n: i + 1, total: items.length });
+        await backupToDrive(items[i].id, null, true);
+      }
+      toast(t('driveDone'));
+    } catch (err) { toast(err.message); }
+    loadDrivePanel();
+  });
+  box.querySelector('[data-act="drive-off"]').addEventListener('click', async () => {
+    if (!confirm(t('driveDisconnectConfirm'))) return;
+    try { await api('/api/admin/drive', { method: 'DELETE' }); toast(t('saved')); state.config.driveReady = false; loadDrivePanel(); } catch (err) { toast(err.message); }
   });
 }
 
@@ -1565,10 +2080,13 @@ function handleError(err) {
   toast(err.message);
 }
 
+let routeParams = new URLSearchParams();
 function render() {
   if (!state.user) return location.hash === '#/signup' ? renderSignup() : renderLogin();
   if (session && !session.finished) return; // 녹음 중에는 녹음 화면 유지
-  const h = location.hash.replace(/^#/, '') || '/';
+  const full = location.hash.replace(/^#/, '') || '/';
+  const h = full.split('?')[0];
+  routeParams = new URLSearchParams(full.split('?')[1] || '');
   const detail = h.match(/^\/r\/([\w-]{36})$/);
   if (detail) return pageRecordDetail(detail[1]);
   const admin = state.user.role === 'admin';

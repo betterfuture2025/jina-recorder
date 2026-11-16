@@ -3,6 +3,8 @@
 // - 조각 파일은 R2(AUDIO)가 있으면 R2에, 없으면 DB(chunk_data)에 저장한다.
 import { json, uid, readJson, HttpError } from './util.js';
 import { transcribe } from './stt.js';
+import { summaryFor, tagsFor } from './summary.js';
+import { peopleFor } from './contacts.js';
 
 const KINDS = ['memo', 'meeting', 'consult', 'unassigned'];
 const MAX_CHUNK_BYTES = 1.5 * 1024 * 1024; // 20초 조각은 보통 100KB 이하
@@ -163,11 +165,23 @@ export async function listRecordings(env, request, user) {
   const binds = [];
   if (!all) { where.push('r.owner_id = ?'); binds.push(user.id); }
   if (KINDS.includes(kind)) { where.push('r.kind = ?'); binds.push(kind); }
+  const tag = (url.searchParams.get('tag') || '').trim().replace(/^#/, '').slice(0, 24);
+  if (tag) {
+    where.push('EXISTS (SELECT 1 FROM recording_tags rt JOIN tags tg ON tg.id = rt.tag_id WHERE rt.recording_id = r.id AND tg.name = ? COLLATE NOCASE)');
+    binds.push(tag);
+  }
+  const contact = (url.searchParams.get('contact') || '').trim();
+  if (contact) { where.push('EXISTS (SELECT 1 FROM participants pp WHERE pp.recording_id = r.id AND pp.contact_id = ?)'); binds.push(contact); }
+  const since = Number(url.searchParams.get('days')) || 0;
+  if (since > 0) { where.push(`r.started_at >= datetime('now', ?)`); binds.push(`-${Math.min(3650, since)} days`); }
   const q = (url.searchParams.get('q') || '').trim().slice(0, 60);
   if (q) {
     const like = '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
-    where.push(`(r.title LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM chunk_text t2 WHERE t2.recording_id = r.id AND t2.text LIKE ? ESCAPE '\\'))`);
-    binds.push(like, like);
+    where.push(`(r.title LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM chunk_text t2 WHERE t2.recording_id = r.id AND t2.text LIKE ? ESCAPE '\\')
+      OR EXISTS (SELECT 1 FROM summaries s2 WHERE s2.recording_id = r.id AND (s2.summary LIKE ? ESCAPE '\\' OR s2.todos LIKE ? ESCAPE '\\'))
+      OR EXISTS (SELECT 1 FROM recording_tags rt2 JOIN tags tg2 ON tg2.id = rt2.tag_id WHERE rt2.recording_id = r.id AND tg2.name LIKE ? ESCAPE '\\')
+      OR EXISTS (SELECT 1 FROM participants p2 JOIN contacts c2 ON c2.id = p2.contact_id WHERE p2.recording_id = r.id AND c2.name LIKE ? ESCAPE '\\'))`);
+    binds.push(like, like, like, like, like, like);
   }
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.kind, r.title, r.status, r.started_at, r.ended_at, r.duration_sec, r.consent,
@@ -175,8 +189,13 @@ export async function listRecordings(env, request, user) {
             (SELECT group_concat(text, ' ') FROM (SELECT text FROM chunk_text t WHERE t.recording_id = r.id
                AND t.status = 'done' ORDER BY t.seq LIMIT 3)) AS snippet,
             ${q ? `(SELECT text FROM chunk_text t3 WHERE t3.recording_id = r.id AND t3.text LIKE ? ESCAPE '\\' ORDER BY t3.seq LIMIT 1)` : 'NULL'} AS hit,
-            (SELECT COUNT(*) FROM chunks c WHERE c.recording_id = r.id) AS chunk_count
-       FROM recordings r JOIN users u ON u.id = r.owner_id
+            (SELECT COUNT(*) FROM chunks c WHERE c.recording_id = r.id) AS chunk_count,
+            sm.summary AS sum_json, sm.todos AS todos_json, sm.status AS sum_status,
+            (SELECT group_concat(name, ',') FROM (SELECT tg.name FROM recording_tags rt JOIN tags tg ON tg.id = rt.tag_id
+               WHERE rt.recording_id = r.id ORDER BY tg.name LIMIT 6)) AS tag_list,
+            (SELECT group_concat(name, ',') FROM (SELECT c3.name FROM participants p3 JOIN contacts c3 ON c3.id = p3.contact_id
+               WHERE p3.recording_id = r.id ORDER BY c3.name LIMIT 4)) AS people_list
+       FROM recordings r JOIN users u ON u.id = r.owner_id LEFT JOIN summaries sm ON sm.recording_id = r.id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY r.started_at DESC LIMIT ?`
   ).bind(...(q ? ['%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%'] : []), ...binds, limit).all();
@@ -187,8 +206,12 @@ export async function listRecordings(env, request, user) {
       const from = Math.max(0, i - 40);
       snippet = (from ? '…' : '') + r.hit.slice(from, from + 140);
     }
-    const { hit, ...rest } = r;
-    return { ...rest, snippet };
+    const { hit, sum_json, todos_json, tag_list, people_list, ...rest } = r;
+    let summary_line = '', todo_open = 0, todo_total = 0;
+    try { const a = JSON.parse(sum_json || '[]'); summary_line = a.slice(0, 2).join(' · '); } catch {}
+    try { const tdo = JSON.parse(todos_json || '[]'); todo_total = tdo.length; todo_open = tdo.filter((x) => !x.done).length; } catch {}
+    return { ...rest, snippet, summary_line: r.hit ? '' : summary_line, todo_open, todo_total,
+      tags: tag_list ? tag_list.split(',') : [], people: people_list ? people_list.split(',') : [] };
   });
   return json({ items });
 }
@@ -209,6 +232,9 @@ export async function getRecording(env, user, id) {
       owner_id: rec.owner_id, owner_name: rec.owner_name, owner_email: rec.owner_email,
     },
     chunks: results,
+    summary: await summaryFor(env, id),
+    tags: await tagsFor(env, id),
+    people: await peopleFor(env, id),
   });
 }
 
