@@ -77,6 +77,10 @@ const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><re
 const GOOGLE_G = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
 const ICONS = {
+  mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>`,
+  memo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/></svg>`,
+  meeting: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.8-3 2.8-4.5 5-4.5s4.2 1.5 5 4.5M11 19c.8-3 2.8-4.5 5-4.5s4.2 1.5 5 4.5"/></svg>`,
+  consult: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h11v8H9l-5 4z"/><path d="M15 10h5v8l-3-2.5h-5"/></svg>`,
   records: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>`,
   record: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle class="tab-rec" cx="12" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg>`,
   admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>`,
@@ -100,7 +104,6 @@ function renderLogin() {
   const err = params.get('error');
   const email = params.get('email') || '';
   const errText = err ? t('err_' + err, { email, code: params.get('code') || '' }) : '';
-  const heights = [30, 55, 80, 45, 95, 60, 35, 75, 50, 85, 40, 25, 18, 22, 14, 20, 12];
 
   app.innerHTML = `
     <div class="login">
@@ -109,7 +112,10 @@ function renderLogin() {
         ${langButton()}
       </div>
       <div class="login-body">
-        <div class="wave" aria-hidden="true">${heights.map((h, i) => `<i style="--h:${h};--i:${i}"></i>`).join('')}</div>
+        <div class="jina-hero">
+          <img src="/jina/wave.png" alt="${esc(t('jinaWaveAlt'))}">
+          <div class="bubble">${t('jinaHello')}</div>
+        </div>
         <h1>${esc(t('loginTitle'))}</h1>
         <p>${esc(t('loginBody'))}</p>
         ${errText && !errText.startsWith('err_') ? `<div class="notice error" role="alert">${errText}</div>` : ''}
@@ -291,22 +297,31 @@ function shell(active, content) {
 // ── 녹음 (홈) ─────────────────────────────────────────────
 
 function pageRecord() {
+  const u = state.user;
+  const first = esc((u.name || u.email.split('@')[0]).trim());
+  const today = new Date().toLocaleDateString(getLang() === 'ko' ? 'ko-KR' : 'en-AU', { month: 'long', day: 'numeric', weekday: 'long' });
   app.innerHTML = shell('record', `
+    <div class="greet">
+      <span class="face">${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : `<img src="/jina/portrait.png" alt="">`}</span>
+      <div><div class="greet-date">${esc(today)}</div><div class="greet-name">${t('hello', { name: first })}</div></div>
+    </div>
     <section class="rec-hero">
       <button class="rec-button" type="button" data-act="quick-record">
-        <span class="rec-label">${esc(t('quickRecord'))}</span>
+        ${ICONS.mic}<span class="rec-label">${esc(t('quickRecord'))}</span>
       </button>
       <p class="rec-hint">${esc(t('quickRecordHint'))}</p>
     </section>
     <p class="kind-row-title">${esc(t('orChoose'))}</p>
     <div class="kind-row">
-      <button class="kind-btn" type="button" data-kind="memo">${esc(t('kindMemo'))}</button>
-      <button class="kind-btn" type="button" data-kind="meeting">${esc(t('kindMeeting'))}</button>
-      <button class="kind-btn" type="button" data-kind="consult">${esc(t('kindConsult'))}</button>
+      <button class="kind-btn" type="button" data-kind="memo">${ICONS.memo}${esc(t('kindMemo'))}</button>
+      <button class="kind-btn" type="button" data-kind="meeting">${ICONS.meeting}${esc(t('kindMeeting'))}</button>
+      <button class="kind-btn" type="button" data-kind="consult">${ICONS.consult}${esc(t('kindConsult'))}</button>
     </div>
     <section class="section">
-      <div class="section-head"><h2>${esc(t('recentTitle'))}</h2><a href="#/records" class="link-btn">${esc(t('seeAll'))}</a></div>
-      <div class="empty"><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('recordsEmptyBody'))}</p></div>
+      <div class="empty-jina">
+        <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('homeEmptyBody'))}</p></div>
+        <img src="/jina/point.png" alt="${esc(t('jinaPointAlt'))}">
+      </div>
     </section>`);
   bindCommon();
   // 파트 2에서 실제 녹음으로 바뀐다.
@@ -320,10 +335,10 @@ function pageRecord() {
 function pageRecords() {
   app.innerHTML = shell('records', `
     <h2 class="page-title">${esc(t('recordsTitle'))}</h2>
-    <div class="empty">
-      <h3>${esc(t('recordsEmpty'))}</h3>
-      <p>${esc(t('recordsEmptyBody'))}</p>
-      <a class="btn btn-primary" href="#/">${esc(t('goRecord'))}</a>
+    <div class="empty-jina">
+      <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('recordsEmptyBody'))}</p>
+        <a class="btn btn-primary" href="#/">${esc(t('goRecord'))}</a></div>
+      <img src="/jina/think.png" alt="${esc(t('jinaThinkAlt'))}">
     </div>`);
   bindCommon();
 }
@@ -368,9 +383,11 @@ async function pageUsers() {
   };
 
   app.querySelector('main').innerHTML = `
-    <h2 class="page-title">${esc(t('adminTitle'))}</h2>
+    <div class="page-head">
+      <div><h2 class="page-title">${esc(t('adminTitle'))}</h2><p class="lead">${esc(t('usersBody'))}</p></div>
+      <img src="/jina/present.png" alt="${esc(t('jinaPresentAlt'))}">
+    </div>
     ${adminTabs('users')}
-    <p class="lead">${esc(t('usersBody'))}</p>
     <form class="panel" id="add-user" novalidate>
       <h2>${esc(t('addUser'))}</h2>
       <label class="field"><span>${esc(t('email'))}</span><input name="email" type="email" inputmode="email" autocomplete="off" required placeholder="name@gmail.com"></label>

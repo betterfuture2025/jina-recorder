@@ -1,48 +1,55 @@
-/* 지나기록기 — 화면 스타일
+/* 지나기록기 — 화면 스타일 (세이지 디자인)
    색: 차분한 슬레이트 + 진한 청록(일반 동작), 빨강은 오직 녹음에만 쓴다. */
 
 :root {
-  --paper: #F5F7F9;
+  /* 지나기록기 — 세이지 초록 바탕, 차콜 글자, 빨강은 녹음에만 */
+  --paper: #EFF3EE;
   --surface: #FFFFFF;
-  --ink: #1B2430;
-  --muted: #5B6675;
-  --line: #DDE2E8;
-  --line-strong: #C6CDD6;
-  --teal: #0E6E6A;
+  --ink: #1F2328;
+  --muted: #5A6370;
+  --line: #D8E0D9;
+  --line-strong: #C3CDC5;
+  --teal: #3F6E52;        /* 기본 버튼 (세이지 그린) */
   --teal-ink: #FFFFFF;
-  --teal-soft: #E3F1EF;
-  --rec: #D7263D;
-  --rec-soft: #FBE7EA;
+  --teal-soft: #DCE8DE;
+  --sage: #CFE0D3;        /* 지나 캐릭터 뒤 원 */
+  --mustard-soft: #F6E3B4;
+  --mustard-ink: #7A5300;
+  --rec: #D93A3F;
+  --rec-soft: #F6D9DA;
   --warn: #9A5B00;
   --warn-soft: #FFF3DC;
-  --ok: #1D7A46;
+  --ok: #2F7A4C;
 
-  --radius-sm: 8px;
-  --radius: 14px;
+  --radius-sm: 12px;
+  --radius: 18px;
   --gutter: 16px;
-  --tabbar-h: 64px;
+  --tabbar-h: 68px;
 
-  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
+  --font: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #12161C;
-    --surface: #1A2028;
-    --ink: #E7ECF2;
-    --muted: #98A3B0;
-    --line: #2A323D;
-    --line-strong: #3A4452;
-    --teal: #4FB3AC;
-    --teal-ink: #0B1A19;
-    --teal-soft: #173230;
-    --rec: #FF5468;
-    --rec-soft: #3A1A20;
+    --paper: #14181B;
+    --surface: #1C2226;
+    --ink: #E8EDE9;
+    --muted: #9AA59E;
+    --line: #2A3236;
+    --line-strong: #3A454A;
+    --teal: #7FB894;
+    --teal-ink: #0E1A13;
+    --teal-soft: #22352A;
+    --sage: #2A3F31;
+    --mustard-soft: #3A2E12;
+    --mustard-ink: #F0C66B;
+    --rec: #FF5A5F;
+    --rec-soft: #3A1C1E;
     --warn: #F0B45A;
     --warn-soft: #33270F;
-    --ok: #5CC98B;
+    --ok: #6CCB8E;
     color-scheme: dark;
   }
 }
@@ -452,3 +459,48 @@ ol.steps li { margin-bottom: 6px; }
 @media (min-width: 720px) {
   .page-title { font-size: 30px; }
 }
+
+
+/* ── 지나 캐릭터 ── */
+.jina-hero { position: relative; height: 236px; display: flex; justify-content: center; align-items: flex-end; margin: 4px 0 24px; }
+.jina-hero::before { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 220px; height: 220px; border-radius: 50%; background: var(--sage); }
+.jina-hero img { position: relative; height: 236px; width: auto; display: block; }
+.bubble {
+  position: absolute; top: 14px; right: 0;
+  background: var(--surface); color: var(--ink);
+  border-radius: 16px 16px 16px 4px; padding: 10px 14px;
+  font-size: 14px; font-weight: 600; line-height: 1.45;
+  box-shadow: 0 1px 0 var(--line);
+}
+@media (min-width: 420px) { .bubble { right: 8%; } }
+
+.greet { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; }
+.greet-date { font-size: 13px; color: var(--muted); }
+.greet-name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.face { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: var(--sage); flex: none; }
+.face img { width: 100%; height: auto; display: block; margin-top: 2px; }
+
+.rec-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.rec-button svg { width: 34px; height: 34px; position: relative; z-index: 1; }
+.rec-button .rec-label { position: relative; z-index: 1; }
+.kind-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 66px; border-radius: 14px; }
+.kind-btn svg { width: 20px; height: 20px; color: var(--teal); }
+
+.empty-jina {
+  display: flex; gap: 12px; align-items: stretch;
+  background: var(--surface); border-radius: var(--radius);
+  padding: 18px 0 0 18px; overflow: hidden;
+}
+.empty-jina > div { flex: 1; padding-bottom: 18px; }
+.empty-jina h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; }
+.empty-jina p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.empty-jina .btn { margin-top: 14px; }
+.empty-jina img { height: 124px; width: auto; align-self: flex-end; display: block; }
+
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-height: 112px; }
+.page-head > div { padding-bottom: 12px; }
+.page-head .page-title { margin-top: 0; }
+.page-head .lead { margin: 0; }
+.page-head img { height: 108px; width: auto; display: block; margin-right: -6px; }
+
+.tabbar a[aria-current="page"] { font-weight: 700; }
