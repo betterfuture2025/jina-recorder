@@ -163,6 +163,7 @@ const ICONS = {
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`,
   eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
   eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`,
+  mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
@@ -944,11 +945,131 @@ async function finishRecording(btn) {
   render();
 }
 
+// ── 관리: 메일 템플릿 ─────────────────────────────────────
+
+async function pageMailTemplates() {
+  app.innerHTML = shell('admin', `<h2 class="page-title">${esc(t('adminTitle'))}</h2>${adminTabs('mail')}<p class="lead">${esc(t('loading'))}</p>`);
+  bindCommon();
+  let data;
+  try { data = await api('/api/admin/mail-templates'); } catch (err) { return handleError(err); }
+  app.querySelector('main').innerHTML = `
+    <h2 class="page-title">${esc(t('adminTitle'))}</h2>
+    ${adminTabs('mail')}
+    <p class="lead">${esc(t('mailTplLead'))}</p>
+    <ul class="tpl-list">
+      ${data.templates.map((tp) => `
+        <li><a class="tpl-item" href="#/admin/mail/${tp.key}">
+          <span class="tpl-icon">${ICONS.mail}</span>
+          <span class="tpl-text"><b>${esc(tp.label)}</b><small>${esc(tp.about)}</small>
+            <em>${esc(tp.fields.subject)}</em></span>
+          ${tp.customized ? `<span class="tpl-badge">${esc(t('mailTplCustom'))}</span>` : ''}
+        </a></li>`).join('')}
+    </ul>
+    <p class="lead" style="margin-top:16px;font-size:14px">${esc(t('mailTplLater'))}</p>`;
+}
+
+async function pageMailEdit(key) {
+  app.innerHTML = shell('admin', `<p class="lead">${esc(t('loading'))}</p>`);
+  bindCommon();
+  let data;
+  try { data = await api('/api/admin/mail-templates'); } catch (err) { return handleError(err); }
+  const tp = data.templates.find((x) => x.key === key);
+  if (!tp) { location.hash = '#/admin/mail'; return; }
+  const f = tp.fields;
+  const field = (name, label, val, opts = {}) => `
+    <label class="field"><span>${esc(label)}</span>
+      ${opts.area
+        ? `<textarea name="${name}" rows="${opts.rows || 5}" maxlength="2000">${esc(val)}</textarea>`
+        : `<input type="text" name="${name}" value="${esc(val)}" maxlength="200" placeholder="${esc(opts.ph || '')}">`}
+      ${opts.help ? `<small>${esc(opts.help)}</small>` : ''}</label>`;
+
+  app.querySelector('main').innerHTML = `
+    <a href="#/admin/mail" class="back-link">${ICONS.back}${esc(t('adminMail'))}</a>
+    <h2 class="page-title">${esc(tp.label)}</h2>
+    <p class="lead">${esc(tp.about)}</p>
+    <div class="tpl-edit">
+      <form class="panel tpl-form" id="tpl-form" novalidate>
+        <div class="tpl-vars">
+          <span>${esc(t('mailTplVars'))}</span>
+          ${tp.vars.map((v) => `<button type="button" class="chip" data-var="${esc(v)}">{{${esc(v)}}}</button>`).join('')}
+        </div>
+        ${field('subject', t('mailTplSubject'), f.subject)}
+        ${field('heading', t('mailTplHeading'), f.heading)}
+        ${field('body', t('mailTplBody'), f.body, { area: true, rows: 6, help: t('mailTplBodyHelp') })}
+        ${tp.hasButton ? field('button', t('mailTplButton'), f.button, { help: t('mailTplButtonHelp') }) : ''}
+        ${field('footer', t('mailTplFooter'), f.footer, { area: true, rows: 2 })}
+        <div class="tpl-actions">
+          <button type="submit" class="btn btn-primary">${esc(t('save'))}</button>
+          <button type="button" class="btn btn-quiet" data-act="test">${esc(t('mailTplTest'))}</button>
+          ${tp.customized ? `<button type="button" class="link-btn" data-act="reset">${esc(t('mailTplReset'))}</button>` : ''}
+        </div>
+      </form>
+      <section class="tpl-preview" aria-label="${esc(t('mailTplPreview'))}">
+        <div class="tpl-preview-head"><span>${esc(t('mailTplPreview'))}</span><b data-subject></b></div>
+        <iframe title="${esc(t('mailTplPreview'))}" sandbox="allow-same-origin" data-frame></iframe>
+      </section>
+    </div>`;
+
+  const form = app.querySelector('#tpl-form');
+  const frame = app.querySelector('[data-frame]');
+  const subjEl = app.querySelector('[data-subject]');
+  const values = () => Object.fromEntries(new FormData(form));
+  let lastFocus = form.querySelector('[name="body"]');
+  form.querySelectorAll('input, textarea').forEach((el) => el.addEventListener('focus', () => (lastFocus = el)));
+
+  let timer = null; let seq = 0;
+  const refresh = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const my = ++seq;
+      try {
+        const out = await api(`/api/admin/mail-templates/${key}/preview`, { method: 'POST', body: values() });
+        if (my !== seq) return;
+        frame.srcdoc = out.html;
+        subjEl.textContent = out.subject;
+      } catch (err) { toast(err.message); }
+    }, 350);
+  };
+  frame.addEventListener('load', () => {
+    try { frame.style.height = Math.max(420, frame.contentDocument.body.scrollHeight + 8) + 'px'; } catch {}
+  });
+  form.addEventListener('input', refresh);
+  refresh();
+
+  app.querySelectorAll('[data-var]').forEach((b) => b.addEventListener('click', () => {
+    const el = lastFocus; const ins = `{{${b.dataset.var}}}`;
+    const a = el.selectionStart ?? el.value.length; const z = el.selectionEnd ?? el.value.length;
+    el.value = el.value.slice(0, a) + ins + el.value.slice(z);
+    el.focus(); el.setSelectionRange(a + ins.length, a + ins.length);
+    refresh();
+  }));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('[type=submit]'); btn.disabled = true;
+    try { await api(`/api/admin/mail-templates/${key}`, { method: 'PUT', body: values() }); toast(t('saved')); pageMailEdit(key); }
+    catch (err) { toast(err.message); btn.disabled = false; }
+  });
+  app.querySelector('[data-act="test"]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true;
+    try { const r = await api(`/api/admin/mail-templates/${key}/test`, { method: 'POST', body: values() }); toast(t('mailTplSent', { to: r.to })); }
+    catch (err) { toast(err.message); }
+    btn.disabled = false;
+  });
+  const reset = app.querySelector('[data-act="reset"]');
+  if (reset) reset.addEventListener('click', async () => {
+    if (!confirm(t('mailTplResetConfirm'))) return;
+    try { await api(`/api/admin/mail-templates/${key}`, { method: 'DELETE' }); toast(t('mailTplResetDone')); pageMailEdit(key); }
+    catch (err) { toast(err.message); }
+  });
+}
+
 // ── 관리: 사용자 ──────────────────────────────────────────
 
 function adminTabs(active) {
   return `<nav class="subtabs">
     <a href="#/admin/users" ${active === 'users' ? 'aria-current="page"' : ''}>${esc(t('adminUsers'))}</a>
+    <a href="#/admin/mail" ${active === 'mail' ? 'aria-current="page"' : ''}>${esc(t('adminMail'))}</a>
     <a href="#/admin/settings" ${active === 'settings' ? 'aria-current="page"' : ''}>${esc(t('adminSettings'))}</a>
   </nav>`;
 }
@@ -1352,6 +1473,7 @@ function openMenu(btn) {
       ${admin ? `
         <div class="menu-group">${esc(t('adminPage'))}</div>
         ${link('#/admin/users', ICONS.admin, t('adminUsers'), '<span class="menu-count" data-signups hidden></span>')}
+        ${link('#/admin/mail', ICONS.mail, t('adminMail'))}
         ${link('#/admin/settings', ICONS.gear, t('adminSettings'))}` : ''}
       <div class="menu-group">${esc(t('tabMe'))}</div>
       ${link('#/me', ICONS.me, t('myInfo'))}
@@ -1390,6 +1512,8 @@ function render() {
   if (h === '/me') return pageMe();
   if (h === '/admin/users' && admin) return pageUsers();
   if (h === '/admin/settings' && admin) return pageSettings();
+  if (h === '/admin/mail' && admin) return pageMailTemplates();
+  { const mk = h.match(/^\/admin\/mail\/([a-z_]+)$/); if (mk && admin) return pageMailEdit(mk[1]); }
   return pageRecord();
 }
 

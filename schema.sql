@@ -205,3 +205,14 @@ CREATE TABLE IF NOT EXISTS login_failures (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_login_failures ON login_failures(email, created_at);
+
+-- 메일 템플릿: 관리자가 고친 글. 없으면 기본 글을 쓴다.
+CREATE TABLE IF NOT EXISTS mail_templates (
+  key TEXT PRIMARY KEY,
+  subject TEXT,
+  heading TEXT,
+  body TEXT,
+  button TEXT,
+  footer TEXT,
+  updated_at TEXT
+);

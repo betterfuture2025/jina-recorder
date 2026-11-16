@@ -3,7 +3,8 @@
 // 2) 번호를 넣으면 로그인된다 (5번 틀리면 그 번호는 못 씀)
 // 등록되지 않은 이메일이어도 똑같이 "보냈어요"라고 답해서, 누가 등록됐는지 알아낼 수 없게 한다.
 import { json, readJson, normEmail, EMAIL_RE, HttpError, uid, sha256Hex, safeEqual } from './util.js';
-import { sendMail, mailReady } from './mail.js';
+import { mailReady } from './mail.js';
+import { sendTemplate } from './mailTemplates.js';
 import { createSession } from './auth.js';
 import { getSetting } from './settings.js';
 
@@ -28,7 +29,7 @@ export async function startEmailLogin(env, request) {
   const email = normEmail(body.email);
   if (!EMAIL_RE.test(email)) throw new HttpError(400, 'bad_email', '이메일 주소를 확인해 주세요.');
 
-  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND active = 1').bind(email).first();
+  const user = await env.DB.prepare('SELECT id, name FROM users WHERE email = ? AND active = 1').bind(email).first();
   if (!user) return json({ ok: true }); // 등록 여부를 알려 주지 않는다
 
   const recent = await env.DB.prepare(
@@ -45,18 +46,9 @@ export async function startEmailLogin(env, request) {
       .bind(uid(), email, await hashCode(email, code), sqlAfterMinutes(CODE_MINUTES)),
   ]);
 
-  const appName = (await getSetting(env, 'app.name')) || '지나기록기';
-  const spaced = code.split('').join(' ');
-  await sendMail(env, {
-    to: email,
-    subject: `[${appName}] 로그인 인증번호 ${code}`,
-    text: `${appName} 로그인 인증번호: ${code}\n\n${CODE_MINUTES}분 안에 입력해 주세요. 직접 요청하지 않았다면 이 메일은 무시하세요.`,
-    html: `<div style="font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#1B2430">
-      <p style="margin:0 0 8px;font-weight:600">${appName} 로그인 인증번호</p>
-      <p style="font-size:34px;font-weight:700;letter-spacing:6px;margin:12px 0 16px">${spaced}</p>
-      <p style="margin:0;color:#5B6675;font-size:14px">${CODE_MINUTES}분 안에 입력해 주세요.<br>직접 요청하지 않았다면 이 메일은 무시하세요.</p>
-    </div>`,
-  });
+  const site = new URL(request.url).origin;
+  const name = user.name ? `${user.name} 님` : '선생님';
+  await sendTemplate(env, 'login_code', { to: email, site, vars: { 이름: name, 인증번호: code, 분: String(CODE_MINUTES) } });
   return json({ ok: true });
 }
 
@@ -93,13 +85,8 @@ export async function verifyEmailLogin(env, request) {
 }
 
 // 설정 페이지의 "테스트 메일 보내기": 관리자 본인에게 보낸다
-export async function testMail(env, me) {
-  const appName = (await getSetting(env, 'app.name')) || '지나기록기';
-  await sendMail(env, {
-    to: me.email,
-    subject: `[${appName}] 메일 연결 테스트`,
-    text: `${appName}에서 보낸 테스트 메일이에요. 이 메일이 보이면 메일 보내기가 잘 연결된 거예요.`,
-    html: `<p>${appName}에서 보낸 테스트 메일이에요.</p><p>이 메일이 보이면 메일 보내기가 잘 연결된 거예요.</p>`,
-  });
+export async function testMail(env, me, request) {
+  const site = new URL(request.url).origin;
+  await sendTemplate(env, 'test', { to: me.email, site, vars: { 이름: me.name || '' } });
   return json({ ok: true, to: me.email });
 }

@@ -3,6 +3,7 @@
 import { json, fail, HttpError, normEmail } from './util.js';
 import { ensureSchema } from './schema.js';
 import { startEmailLogin, verifyEmailLogin, testMail } from './emailLogin.js';
+import { listTemplates, saveTemplate, resetTemplate, previewTemplate, testTemplate } from './mailTemplates.js';
 import { submitSignup, listSignups, decideSignup } from './signup.js';
 import { passwordLogin, changeMyPassword, adminSetPassword } from './password.js';
 import {
@@ -93,7 +94,17 @@ async function route(request, env, ctx) {
     if (path === '/api/admin/settings' && m === 'GET') return getAdminSettings(env, request);
     if (path === '/api/admin/settings' && m === 'PUT') return putAdminSettings(env, request, me);
     if (path === '/api/admin/settings/test-google' && m === 'POST') return testGoogle(env, request);
-    if (path === '/api/admin/settings/test-mail' && m === 'POST') return testMail(env, me);
+    if (path === '/api/admin/settings/test-mail' && m === 'POST') return testMail(env, me, request);
+    if (path === '/api/admin/mail-templates' && m === 'GET') return listTemplates(env);
+    {
+      const mt = path.match(/^\/api\/admin\/mail-templates\/([a-z_]+)(\/preview|\/test)?$/);
+      if (mt) {
+        if (!mt[2] && m === 'PUT') return saveTemplate(env, request, mt[1]);
+        if (!mt[2] && m === 'DELETE') return resetTemplate(env, mt[1]);
+        if (mt[2] === '/preview' && m === 'POST') return previewTemplate(env, request, mt[1]);
+        if (mt[2] === '/test' && m === 'POST') return testTemplate(env, request, mt[1], me);
+      }
+    }
   }
 
   // ── 녹음 (로그인한 사람) ──

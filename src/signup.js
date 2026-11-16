@@ -1,6 +1,7 @@
 // 가입 신청: 누구나 신청 → 관리자가 승인하면 그 이메일로 로그인할 수 있다.
 import { json, uid, readJson, normEmail, EMAIL_RE, HttpError } from './util.js';
-import { mailReady, sendMail } from './mail.js';
+import { mailReady } from './mail.js';
+import { sendTemplate } from './mailTemplates.js';
 import { getSetting } from './settings.js';
 import { PROFILE_FIELDS, pickProfile, displayName } from './profile.js';
 import { checkPasswordRule, hashPassword } from './password.js';
@@ -40,11 +41,9 @@ export async function submitSignup(env, request) {
       const { results } = await env.DB.prepare("SELECT email FROM users WHERE role = 'admin' AND active = 1").all();
       const site = new URL(request.url).origin;
       for (const a of results) {
-        await sendMail(env, {
-          to: a.email,
-          subject: `[${appName}] 가입 신청: ${name}`,
-          text: `${name} (${email}) 님이 가입을 신청했어요.\n${note ? '메모: ' + note + '\n' : ''}\n승인: ${site}/#/admin/users`,
-          html: `<p><b>${escapeHtml(name)}</b> (${escapeHtml(email)}) 님이 가입을 신청했어요.</p>${note ? `<p>메모: ${escapeHtml(note)}</p>` : ''}<p><a href="${site}/#/admin/users">관리 화면에서 승인하기</a></p>`,
+        await sendTemplate(env, 'signup_admin', {
+          to: a.email, site,
+          vars: { 신청자: name, 신청자이메일: email, 직책: prof.position || '', 전화번호: prof.phone || '', 메모: note || '' },
         });
       }
     }
@@ -90,12 +89,7 @@ export async function decideSignup(env, request, me, id) {
       if (await mailReady(env)) {
         const appName = (await getSetting(env, 'app.name')) || '지나기록기';
         const site = new URL(request.url).origin;
-        await sendMail(env, {
-          to: reqRow.email,
-          subject: `[${appName}] 가입이 승인됐어요`,
-          text: `${reqRow.name} 님, ${appName} 가입이 승인됐어요.\n${site} 에서 로그인해 주세요.`,
-          html: `<p>${escapeHtml(reqRow.name)} 님, ${escapeHtml(appName)} 가입이 승인됐어요.</p><p><a href="${site}">로그인하러 가기</a></p>`,
-        });
+        await sendTemplate(env, 'signup_approved', { to: reqRow.email, site, vars: { 이름: reqRow.name, 이메일: reqRow.email } });
       }
     } catch (err) {
       console.error('approve mail failed', err && err.message);
