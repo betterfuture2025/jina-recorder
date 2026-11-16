@@ -113,11 +113,87 @@ function renderLogin() {
         <h1>${esc(t('loginTitle'))}</h1>
         <p>${esc(t('loginBody'))}</p>
         ${errText && !errText.startsWith('err_') ? `<div class="notice error" role="alert">${errText}</div>` : ''}
-        <a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>
+        <div id="login-msg"></div>
+        ${state.config.emailReady ? `
+        <form id="email-start" class="login-form" novalidate>
+          <label class="field"><span>${esc(t('emailLabel'))}</span>
+            <input name="email" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${esc(loginEmail)}"></label>
+          <button class="btn btn-primary btn-block" type="submit">${esc(t('sendCode'))}</button>
+        </form>
+        <form id="email-verify" class="login-form" novalidate hidden>
+          <p class="code-sent"></p>
+          <label class="field"><span>${esc(t('codeLabel'))}</span>
+            <input name="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" required></label>
+          <button class="btn btn-primary btn-block" type="submit">${esc(t('loginWithCode'))}</button>
+          <div class="row" style="margin-top:8px">
+            <button class="link-btn" type="button" data-act="resend">${esc(t('resendCode'))}</button>
+            <button class="link-btn" type="button" data-act="change-email" style="text-align:right">${esc(t('changeEmail'))}</button>
+          </div>
+        </form>` : ''}
+        ${state.config.emailReady && state.config.googleReady ? `<div class="or"><span>${esc(t('or'))}</span></div>` : ''}
+        ${state.config.googleReady || !state.config.emailReady ? `<a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>` : ''}
         <p class="login-foot">${esc(t('loginOnlyAllowed'))} <a href="/privacy.html">${esc(t('privacy'))}</a></p>
       </div>
     </div>`;
   bindLang(app, renderLogin);
+  if (state.config.emailReady) bindEmailLogin();
+}
+
+let loginEmail = '';
+
+function bindEmailLogin() {
+  const start = app.querySelector('#email-start');
+  const verify = app.querySelector('#email-verify');
+  const msg = app.querySelector('#login-msg');
+  const show = (text, kind = 'error') => { msg.innerHTML = text ? `<div class="notice ${kind}" role="alert">${esc(text)}</div>` : ''; };
+
+  async function sendCode(btn) {
+    btn.disabled = true;
+    show('');
+    try {
+      await api('/api/login/email/start', { method: 'POST', body: { email: loginEmail } });
+      start.hidden = true;
+      verify.hidden = false;
+      verify.querySelector('.code-sent').innerHTML = t('codeSent', { email: loginEmail });
+      verify.querySelector('[name=code]').value = '';
+      verify.querySelector('[name=code]').focus();
+    } catch (err) { show(err.message); }
+    btn.disabled = false;
+  }
+
+  start.addEventListener('submit', (e) => {
+    e.preventDefault();
+    loginEmail = start.querySelector('[name=email]').value.trim().toLowerCase();
+    if (!loginEmail.includes('@')) return show(t('emailInvalid'));
+    sendCode(start.querySelector('[type=submit]'));
+  });
+
+  verify.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = verify.querySelector('[type=submit]');
+    const code = verify.querySelector('[name=code]').value.replace(/\D/g, '');
+    if (code.length !== 6) return show(t('codeInvalid'));
+    btn.disabled = true;
+    show('');
+    try {
+      await api('/api/login/email/verify', { method: 'POST', body: { email: loginEmail, code } });
+      const { user } = await api('/api/me');
+      state.user = user;
+      history.replaceState(null, '', '/');
+      render();
+    } catch (err) { show(err.message); btn.disabled = false; }
+  });
+
+  // 6자리를 다 넣으면 바로 로그인
+  verify.querySelector('[name=code]').addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    if (e.target.value.length === 6) verify.requestSubmit();
+  });
+  verify.querySelector('[data-act=resend]').addEventListener('click', (e) => { sendCode(e.target); toast(t('codeResent')); });
+  verify.querySelector('[data-act=change-email]').addEventListener('click', () => {
+    verify.hidden = true; start.hidden = false; show('');
+    start.querySelector('[name=email]').focus();
+  });
 }
 
 // ── 처음 설치 화면 ────────────────────────────────────────
@@ -392,7 +468,21 @@ async function pageSettings() {
     </form>
 
     ${later(t('secAI'), t('secAIDesc'), 6)}
-    ${later(t('secEmail'), t('secEmailDesc'), 5)}
+    <form class="panel" data-section="email">
+      <h2>${esc(t('secEmail'))}</h2>
+      <p class="desc">${esc(t('secEmailDesc2'))}</p>
+      <label class="field"><span>${esc(t('resendKey'))}</span>
+        <input name="email.resend_key" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(s['email.resend_key'].set ? t('secretPlaceholder') : 're_...')}">
+        ${s['email.resend_key'].set ? `<small>${t('secretSet', { hint: s['email.resend_key'].hint })}</small>` : ''}</label>
+      <label class="field"><span>${esc(t('mailFrom'))}</span>
+        <input name="email.from" type="text" spellcheck="false" autocomplete="off" placeholder="지나기록기 &lt;noreply@도메인&gt;" value="${esc(s['email.from'].value)}">
+        <small>${esc(t('mailFromHelp'))}</small></label>
+      <div class="test-result"></div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn btn-primary shrink" type="submit">${esc(t('save'))}</button>
+        <button class="btn btn-quiet shrink" type="button" data-act="test-mail">${esc(t('sendTestMail'))}</button>
+      </div>
+    </form>
     ${later(t('secDrive'), t('secDriveDesc'), 8)}`;
 
   app.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.dataset.copy, b)));
@@ -407,6 +497,18 @@ async function pageSettings() {
       pageSettings();
     } catch (err) { toast(err.message); }
   }));
+
+  app.querySelector('[data-act="test-mail"]').addEventListener('click', async (e) => {
+    const out = e.target.closest('form').querySelector('.test-result');
+    e.target.disabled = true;
+    try {
+      const r = await api('/api/admin/settings/test-mail', { method: 'POST' });
+      out.innerHTML = `<div class="notice ok" role="status">${t('testMailSent', { email: r.to })}</div>`;
+    } catch (err) {
+      out.innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
+    }
+    e.target.disabled = false;
+  });
 
   app.querySelector('[data-act="test-google"]').addEventListener('click', async (e) => {
     const out = e.target.closest('form').querySelector('.test-result');

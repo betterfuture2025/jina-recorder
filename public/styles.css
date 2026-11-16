@@ -371,6 +371,14 @@ ol.steps li { margin-bottom: 6px; }
 .wave i:nth-child(n+12) { background: var(--line-strong); }
 @keyframes wave-in { from { transform: scaleY(.1); opacity: 0; } }
 
+/* ── 이메일 로그인 ── */
+.login-form { margin-bottom: 4px; }
+.login-form[hidden] { display: none; }
+.code-sent { color: var(--muted); font-size: 14px; margin: 0 0 14px !important; }
+.code-input { font-size: 26px !important; letter-spacing: .4em; text-align: center; font-weight: 650; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin: 18px 0; }
+.or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+
 /* ── 사용자 목록 ── */
 .user-list { list-style: none; margin: 0; padding: 0; }
 .user-item {

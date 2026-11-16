@@ -2,6 +2,7 @@
 import { json, uid, readJson, normEmail, EMAIL_RE, HttpError, safeEqual } from './util.js';
 import { hasEncKey, isPlaceholder } from './crypto.js';
 import { saveSettings, listForAdmin, getSetting } from './settings.js';
+import { mailReady } from './mail.js';
 import { redirectUri, createSession, testGoogleCredentials } from './auth.js';
 
 // ── 처음 설치 ───────────────────────────────────────────
@@ -142,8 +143,10 @@ export async function testGoogle(env, request) {
 
 // 누구나 볼 수 있는 기본 정보 (로그인 화면용)
 export async function publicConfig(env) {
-  const [name, clientId] = await Promise.all([getSetting(env, 'app.name'), getSetting(env, 'google.client_id')]);
-  return json({ appName: name || '지나기록기', googleReady: !!clientId });
+  const [name, clientId, emailReady] = await Promise.all([
+    getSetting(env, 'app.name'), getSetting(env, 'google.client_id'), mailReady(env),
+  ]);
+  return json({ appName: name || '지나기록기', googleReady: !!clientId, emailReady });
 }
 
 export { createSession };

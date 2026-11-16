@@ -2,6 +2,7 @@
 // 파트 1: 로그인, 처음 설치, 사용자 관리, 설정
 import { json, fail, HttpError, normEmail } from './util.js';
 import { ensureSchema } from './schema.js';
+import { startEmailLogin, verifyEmailLogin, testMail } from './emailLogin.js';
 import {
   currentUser, requireUser, requireAdmin, logout, startGoogleLogin, finishGoogleLogin, createSession,
 } from './auth.js';
@@ -55,6 +56,8 @@ async function route(request, env, ctx) {
   if (path === '/api/config' && m === 'GET') return publicConfig(env);
   if (path === '/api/setup/status' && m === 'GET') return setupStatus(env, request);
   if (path === '/api/setup' && m === 'POST') return runSetup(env, request);
+  if (path === '/api/login/email/start' && m === 'POST') return startEmailLogin(env, request);
+  if (path === '/api/login/email/verify' && m === 'POST') return verifyEmailLogin(env, request);
 
   // ── 로그인한 사람 ──
   if (path === '/api/me' && m === 'GET') {
@@ -75,6 +78,7 @@ async function route(request, env, ctx) {
     if (path === '/api/admin/settings' && m === 'GET') return getAdminSettings(env, request);
     if (path === '/api/admin/settings' && m === 'PUT') return putAdminSettings(env, request, me);
     if (path === '/api/admin/settings/test-google' && m === 'POST') return testGoogle(env, request);
+    if (path === '/api/admin/settings/test-mail' && m === 'POST') return testMail(env, me);
   }
 
   // 파트 2 이후 기능은 로그인 확인만 해 두고 아직 없음

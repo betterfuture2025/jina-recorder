@@ -151,3 +151,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS segments_fts USING fts5(
   segment_id UNINDEXED,
   tokenize = 'unicode61'
 );
+
+-- 이메일 인증번호 로그인 (코드 원문은 저장하지 않고 해시만)
+CREATE TABLE IF NOT EXISTS login_codes (
+  id          TEXT PRIMARY KEY,
+  email       TEXT NOT NULL COLLATE NOCASE,
+  code_hash   TEXT NOT NULL,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  used        INTEGER NOT NULL DEFAULT 0,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_login_codes_email ON login_codes(email, created_at DESC);

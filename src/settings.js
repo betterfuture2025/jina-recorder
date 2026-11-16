@@ -9,6 +9,11 @@ export const DEFS = {
                             pattern: /^[\w.-]+\.apps\.googleusercontent\.com$/,
                             hint: '…apps.googleusercontent.com 으로 끝나야 해요.' },
   'google.client_secret': { secret: true,  max: 200, label: '클라이언트 보안 비밀번호' },
+  'email.resend_key':     { secret: true,  max: 200, label: 'Resend API 키', pattern: /^re_[\w-]+$/,
+                            hint: 're_ 로 시작해야 해요.' },
+  'email.from':           { secret: false, max: 200, label: '보내는 주소',
+                            pattern: /^([^<>]*<)?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/,
+                            hint: '예: 지나기록기 <noreply@도메인>' },
 };
 
 export async function getSetting(env, key) {
