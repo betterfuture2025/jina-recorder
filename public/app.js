@@ -151,6 +151,9 @@ const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><re
 const GOOGLE_G = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
 const ICONS = {
+  menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
+  gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
+  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
   pause: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
   play: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>`,
   stop: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>`,
@@ -406,7 +409,8 @@ function shell(active, content) {
   return `
     <div class="shell">
       <header class="topbar">
-        <h1>${esc(state.config.appName)}</h1>
+        <button type="button" class="menu-btn" data-act="menu" aria-label="${esc(t('menu'))}" aria-expanded="false">${ICONS.menu}</button>
+        <h1><a href="#/" class="home-link">${esc(state.config.appName)}</a></h1>
         ${langButton()}
         <a href="#/me" aria-label="${esc(t('tabMe'))}">${avatar(u)}</a>
       </header>
@@ -422,7 +426,7 @@ function shell(active, content) {
 function pageRecord() {
   const u = state.user;
   const first = esc((u.name || u.email.split('@')[0]).trim());
-  const today = new Date().toLocaleDateString(getLang() === 'ko' ? 'ko-KR' : 'en-AU', { month: 'long', day: 'numeric', weekday: 'long' });
+  const today = fmtStamp(new Date(), { time: false });
   app.innerHTML = shell('record', `
     <div class="greet">
       <span class="face">${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : `<img src="/jina/portrait.png" alt="">`}</span>
@@ -440,6 +444,12 @@ function pageRecord() {
       <button class="kind-btn" type="button" data-kind="meeting">${ICONS.meeting}${esc(t('kindMeeting'))}</button>
       <button class="kind-btn" type="button" data-kind="consult">${ICONS.consult}${esc(t('kindConsult'))}</button>
     </div>
+    ${u.role === 'admin' ? `<a class="admin-card" href="#/admin/users">
+      <span class="admin-card-icon">${ICONS.admin}</span>
+      <span class="admin-card-text"><b>${esc(t('adminPage'))}</b><small>${esc(t('adminCardBody'))}</small></span>
+      <span class="menu-count" id="home-signups" hidden></span>
+      <span class="admin-card-arrow" aria-hidden="true">›</span>
+    </a>` : ''}
     <section class="section" id="recent">
       <div class="empty-jina">
         <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('homeEmptyBody'))}</p></div>
@@ -450,6 +460,10 @@ function pageRecord() {
   app.querySelector('[data-act="quick-record"]').addEventListener('click', () => beginRecording('unassigned'));
   app.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => beginRecording(b.dataset.kind)));
   loadRecent();
+  if (u.role === 'admin') api('/api/admin/signups').then(({ requests }) => {
+    const el = app.querySelector('#home-signups');
+    if (el && requests.length) { el.textContent = t('newSignups', { n: requests.length }); el.hidden = false; }
+  }).catch(() => {});
 }
 
 async function loadRecent() {
@@ -1070,6 +1084,50 @@ function pageMe() {
 
 function bindCommon() {
   bindLang(app, render);
+  const mb = app.querySelector('[data-act="menu"]');
+  if (mb) mb.addEventListener('click', () => openMenu(mb));
+}
+
+// 왼쪽에서 나오는 메뉴: 모든 화면과 관리자 페이지로 바로 가기
+function openMenu(btn) {
+  const u = state.user;
+  const admin = u.role === 'admin';
+  const here = location.hash || '#/';
+  const link = (href, icon, label, extra = '') =>
+    `<a href="${href}" class="menu-link" ${here === href ? 'aria-current="page"' : ''}>${icon}<span>${esc(label)}</span>${extra}</a>`;
+  const wrap = document.createElement('div');
+  wrap.className = 'drawer-wrap';
+  wrap.innerHTML = `
+    <nav class="drawer" aria-label="${esc(t('menu'))}">
+      <div class="drawer-head">
+        <span class="face"><img src="${u.picture ? esc(u.picture) : '/jina/portrait.png'}" alt="" referrerpolicy="no-referrer"></span>
+        <div><div class="drawer-name">${esc(u.name || u.email.split('@')[0])}</div>
+          <div class="drawer-role">${esc(admin ? t('roleAdmin') : t('roleTeacher'))}${u.position ? ' · ' + esc(u.position) : ''}</div></div>
+      </div>
+      ${link('#/', ICONS.record, t('tabRecord'))}
+      ${link('#/records', ICONS.records, t('tabRecords'))}
+      ${admin ? `
+        <div class="menu-group">${esc(t('adminPage'))}</div>
+        ${link('#/admin/users', ICONS.admin, t('adminUsers'), '<span class="menu-count" data-signups hidden></span>')}
+        ${link('#/admin/settings', ICONS.gear, t('adminSettings'))}` : ''}
+      <div class="menu-group">${esc(t('tabMe'))}</div>
+      ${link('#/me', ICONS.me, t('myInfo'))}
+      <button type="button" class="menu-link" data-act="menu-logout">${ICONS.logout}<span>${esc(t('logout'))}</span></button>
+    </nav>`;
+  document.body.appendChild(wrap);
+  btn.setAttribute('aria-expanded', 'true');
+  const close = () => { wrap.remove(); btn.setAttribute('aria-expanded', 'false'); btn.focus(); };
+  wrap.addEventListener('click', (e) => { if (e.target === wrap || e.target.closest('a')) close(); });
+  wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  wrap.querySelector('[data-act="menu-logout"]').addEventListener('click', async () => {
+    try { await api('/api/logout', { method: 'POST' }); } catch {}
+    wrap.remove(); state.user = null; location.hash = ''; renderLogin();
+  });
+  wrap.querySelector('.menu-link').focus();
+  if (admin) api('/api/admin/signups').then(({ requests }) => {
+    const el = wrap.querySelector('[data-signups]');
+    if (el && requests.length) { el.textContent = requests.length; el.hidden = false; el.setAttribute('aria-label', t('signupRequests', { n: requests.length })); }
+  }).catch(() => {});
 }
 
 function handleError(err) {

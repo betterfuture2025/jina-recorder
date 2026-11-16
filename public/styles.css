@@ -590,3 +590,46 @@ body:has(.rec-screen) { background: #1F2328; }
 
 .user-en { font-size: 14px; color: var(--ink); }
 .sheet { max-height: 90dvh; overflow-y: auto; }
+
+/* ── 메뉴 (왼쪽 서랍) ── */
+.menu-btn { width: 40px; height: 40px; margin-left: -8px; border: 0; background: transparent; color: var(--ink); border-radius: 10px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.menu-btn svg { width: 24px; height: 24px; }
+.home-link { color: inherit; text-decoration: none; }
+.drawer-wrap { position: fixed; inset: 0; z-index: 70; background: rgba(15, 18, 20, .4); }
+.drawer {
+  position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 84vw);
+  background: var(--surface); padding: calc(env(safe-area-inset-top) + 18px) 12px 24px;
+  display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+  box-shadow: 2px 0 0 var(--line);
+  animation: drawer-in .18s ease-out;
+}
+@keyframes drawer-in { from { transform: translateX(-24px); opacity: 0; } }
+.drawer-head { display: flex; align-items: center; gap: 12px; padding: 4px 8px 16px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.drawer-name { font-weight: 700; font-size: 16px; }
+.drawer-role { font-size: 13px; color: var(--muted); }
+.menu-group { font-size: 13px; font-weight: 600; color: var(--muted); padding: 14px 10px 4px; }
+.menu-link {
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 10px;
+  border-radius: 12px; color: var(--ink); text-decoration: none; font: inherit; font-size: 16px; font-weight: 600;
+  background: transparent; border: 0; width: 100%; text-align: left; cursor: pointer;
+}
+.menu-link svg { width: 22px; height: 22px; color: var(--muted); flex: none; }
+.menu-link:hover, .menu-link[aria-current="page"] { background: var(--teal-soft); }
+.menu-link[aria-current="page"] svg { color: var(--teal); }
+.menu-link span:first-of-type { flex: 1; }
+.menu-count { font-size: 12px; font-weight: 700; color: var(--mustard-ink); background: var(--mustard-soft); border-radius: 999px; padding: 2px 9px; }
+.menu-count[hidden] { display: none; }
+
+/* ── 홈: 관리자 바로가기 ── */
+.admin-card {
+  display: flex; align-items: center; gap: 12px; margin-top: 24px;
+  background: var(--surface); border-radius: var(--radius); padding: 14px 16px;
+  color: var(--ink); text-decoration: none; border: 1px solid var(--line);
+}
+.admin-card:hover { border-color: var(--line-strong); }
+.admin-card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; flex: none; }
+.admin-card-icon svg { width: 22px; height: 22px; }
+.admin-card-text { flex: 1; display: flex; flex-direction: column; }
+.admin-card-text b { font-size: 16px; }
+.admin-card-text small { font-size: 13px; color: var(--muted); }
+.admin-card-arrow { font-size: 24px; color: var(--muted); line-height: 1; }
