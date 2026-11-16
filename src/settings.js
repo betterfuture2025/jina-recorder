@@ -19,6 +19,32 @@ export const DEFS = {
   'email.from':           { secret: false, max: 200, label: '보내는 주소',
                             pattern: /^([^<>]*<)?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/,
                             hint: '예: 지나기록기 <noreply@도메인>' },
+
+  // ── AI (파트 6) ──
+  'ai.summary_provider':  { secret: false, max: 12, label: '요약에 쓸 AI', pattern: /^(cf|anthropic|openai)$/ },
+  'ai.analysis_provider': { secret: false, max: 12, label: '분석에 쓸 AI', pattern: /^(cf|anthropic|openai)$/ },
+  'ai.cf_model':          { secret: false, max: 120, label: 'Cloudflare AI 모델', pattern: /^@cf\/[\w.\/-]+$/,
+                            hint: '@cf/ 로 시작해야 해요.' },
+  'ai.anthropic_key':     { secret: true,  max: 300, label: 'Claude API 키', pattern: /^sk-ant-[\w-]+$/,
+                            hint: 'sk-ant- 로 시작해야 해요.' },
+  'ai.anthropic_model':   { secret: false, max: 80, label: 'Claude 모델', pattern: /^claude-[\w.-]+$/ },
+  'ai.openai_base':       { secret: false, max: 200, label: '주소 (Base URL)', pattern: /^https:\/\/[^\s]+$/,
+                            hint: 'https:// 로 시작하는 주소예요. 예: https://api.openai.com/v1' },
+  'ai.openai_key':        { secret: true,  max: 300, label: 'API 키' },
+  'ai.openai_model':      { secret: false, max: 120, label: '모델 이름', pattern: /^[\w.:\/-]+$/ },
+  'ai.auto_summary':      { secret: false, max: 1, label: '자동 요약', pattern: /^[01]$/ },
+
+  // ── 요약 메일 (파트 5) ──
+  'mail.summary_auto':    { secret: false, max: 1, label: '요약 메일 자동 보내기', pattern: /^[01]$/ },
+  'mail.summary_cc':      { secret: false, max: 400, label: '요약 메일 같이 받을 사람',
+                            pattern: /^\s*[^\s@,]+@[^\s@,]+\.[^\s@,]+(\s*,\s*[^\s@,]+@[^\s@,]+\.[^\s@,]+)*\s*$/,
+                            hint: '이메일을 쉼표로 나눠서 넣어 주세요.' },
+
+  // ── 구글 드라이브 (파트 8) ──
+  'drive.refresh_token':  { secret: true,  max: 600, label: '드라이브 연결', hidden: true },
+  'drive.account':        { secret: false, max: 200, label: '연결한 구글 계정', hidden: true },
+  'drive.folder_id':      { secret: false, max: 200, label: '백업 폴더', hidden: true },
+  'drive.auto':           { secret: false, max: 1, label: '자동 백업', pattern: /^[01]$/ },
 };
 
 export async function getSetting(env, key) {

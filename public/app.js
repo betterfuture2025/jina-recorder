@@ -164,6 +164,10 @@ const ICONS = {
   eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
   eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`,
   mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>`,
+  spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+  people: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.6c2.4.2 4 1.9 4.5 4.6"/></svg>`,
+  exit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4"/><path d="M14 8l4 4-4 4M18 12H9"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
@@ -472,27 +476,87 @@ function renderSetup(status) {
 
 // ── 로그인 후 틀 ──────────────────────────────────────────
 
+// 화면 틀: 사용자 화면과 관리자 화면은 메뉴가 완전히 따로다.
+//  - 휴대폰: 위 막대 + 아래 탭 (사용자 탭 / 관리자 탭이 다름)
+//  - PC(넓은 화면): 왼쪽 메뉴 막대 + 가운데 내용
+function navItems(mode) {
+  const admin = state.user.role === 'admin';
+  if (mode === 'admin') {
+    return {
+      main: [
+        { id: 'users', href: '#/admin/users', icon: ICONS.admin, label: t('adminUsers'), count: true },
+        { id: 'insights', href: '#/admin/insights', icon: ICONS.spark, label: t('adminInsights') },
+        { id: 'contacts', href: '#/admin/contacts', icon: ICONS.people, label: t('adminContacts') },
+        { id: 'mail', href: '#/admin/mail', icon: ICONS.mail, label: t('adminMail') },
+        { id: 'settings', href: '#/admin/settings', icon: ICONS.gear, label: t('adminSettings') },
+      ],
+      tabs: ['users', 'insights', 'mail', 'settings'],
+      switchTo: { href: '#/', icon: ICONS.exit, label: t('toUserView') },
+    };
+  }
+  return {
+    main: [
+      { id: 'record', href: '#/', icon: ICONS.record, label: t('tabRecord') },
+      { id: 'records', href: '#/records', icon: ICONS.records, label: t('tabRecords') },
+      { id: 'me', href: '#/me', icon: ICONS.me, label: t('myInfo') },
+    ],
+    tabs: ['records', 'record', 'me'],
+    switchTo: admin ? { href: '#/admin/users', icon: ICONS.shield, label: t('adminPage') } : null,
+  };
+}
+
 function shell(active, content) {
   const u = state.user;
-  const tabs = [
-    { id: 'records', href: '#/records', label: t('tabRecords') },
-    { id: 'record', href: '#/', label: t('tabRecord') },
-    ...(u.role === 'admin' ? [{ id: 'admin', href: '#/admin/users', label: t('tabAdmin') }] : []),
-    { id: 'me', href: '#/me', label: t('tabMe') },
-  ];
+  const mode = active === 'admin' || String(active).startsWith('admin:') ? 'admin' : 'user';
+  const section = mode === 'admin'
+    ? (String(active).split(':')[1] || ((location.hash.match(/^#\/admin\/(\w+)/) || [])[1]) || 'users')
+    : active;
+  const nav = navItems(mode);
+  const link = (it, cls) => `<a href="${it.href}" class="${cls}" ${it.id === section ? 'aria-current="page"' : ''}>${it.icon}<span>${esc(it.label)}</span>${it.count ? '<span class="menu-count" data-signups hidden></span>' : ''}</a>`;
+  const tabs = nav.tabs.map((id) => nav.main.find((x) => x.id === id));
+  if (mode === 'admin') tabs.push({ id: '_exit', href: nav.switchTo.href, icon: nav.switchTo.icon, label: t('tabExit') });
+  if (mode === 'admin') setTimeout(loadSignupCount, 0);
   return `
-    <div class="shell">
-      <header class="topbar">
-        <button type="button" class="menu-btn" data-act="menu" aria-label="${esc(t('menu'))}" aria-expanded="false">${ICONS.menu}</button>
-        <h1><a href="#/" class="home-link">${esc(state.config.appName)}</a></h1>
-        ${langButton()}
-        <a href="#/me" aria-label="${esc(t('tabMe'))}">${avatar(u)}</a>
-      </header>
-      <main>${content}</main>
+    <div class="layout layout-${mode}">
+      <aside class="side" aria-label="${esc(t('menu'))}">
+        <a href="${mode === 'admin' ? '#/admin/users' : '#/'}" class="side-brand">
+          <img src="/icons/icon-192.png" alt="" width="32" height="32">
+          <span>${esc(state.config.appName)}</span>
+          ${mode === 'admin' ? `<em>${esc(t('adminBadge'))}</em>` : ''}
+        </a>
+        <nav class="side-nav">
+          ${nav.main.map((it) => link(it, 'side-link')).join('')}
+          ${mode === 'user' ? `<a href="/guide" class="side-link">${ICONS.help}<span>${esc(t('guide'))}</span></a>` : ''}
+        </nav>
+        <div class="side-foot">
+          ${nav.switchTo ? `<a href="${nav.switchTo.href}" class="side-switch">${nav.switchTo.icon}<span>${esc(nav.switchTo.label)}</span></a>` : ''}
+          <a href="#/me" class="side-user">${avatar(u)}<span><b>${esc(u.name || u.email.split('@')[0])}</b><small>${esc(u.role === 'admin' ? t('roleAdmin') : t('roleTeacher'))}</small></span></a>
+        </div>
+      </aside>
+      <div class="shell">
+        <header class="topbar">
+          <button type="button" class="menu-btn" data-act="menu" aria-label="${esc(t('menu'))}" aria-expanded="false">${ICONS.menu}</button>
+          <h1><a href="${mode === 'admin' ? '#/admin/users' : '#/'}" class="home-link">${esc(mode === 'admin' ? t('adminPage') : state.config.appName)}</a></h1>
+          ${langButton()}
+          ${mode === 'admin'
+            ? `<a href="#/" class="exit-btn">${ICONS.exit}<span>${esc(t('toUserView'))}</span></a>`
+            : `<a href="#/me" class="top-avatar" aria-label="${esc(t('tabMe'))}">${avatar(u)}</a>`}
+        </header>
+        <main>${content}</main>
+      </div>
     </div>
-    <div class="tabbar"><nav aria-label="tabs">
-      ${tabs.map((tb) => `<a href="${tb.href}" ${tb.id === active ? 'aria-current="page"' : ''}>${ICONS[tb.id]}<span>${esc(tb.label)}</span></a>`).join('')}
+    <div class="tabbar tabbar-${mode}"><nav aria-label="tabs">
+      ${tabs.map((tb) => `<a href="${tb.href}" ${tb.id === section ? 'aria-current="page"' : ''}>${tb.icon}<span>${esc(tb.label)}</span>${tb.count ? '<span class="tab-count" data-signups hidden></span>' : ''}</a>`).join('')}
     </nav></div>`;
+}
+
+function loadSignupCount() {
+  if (state.user?.role !== 'admin') return;
+  api('/api/admin/signups').then(({ requests }) => {
+    document.querySelectorAll('[data-signups]').forEach((el) => {
+      if (requests.length) { el.textContent = requests.length; el.hidden = false; el.setAttribute('aria-label', t('signupRequests', { n: requests.length })); }
+    });
+  }).catch(() => {});
 }
 
 // ── 녹음 (홈) ─────────────────────────────────────────────
@@ -945,16 +1009,25 @@ async function finishRecording(btn) {
   render();
 }
 
+
+// 파트 3·7 화면 (곧 채움)
+function pageSoon(section, titleKey, part) {
+  app.innerHTML = shell('admin:' + section, `<h2 class="page-title">${esc(t(titleKey))}</h2>
+    <div class="panel is-later"><h2>${esc(t(titleKey))}<span class="later-chip">${esc(t('comingInPart', { n: part }))}</span></h2></div>`);
+  bindCommon();
+}
+function pageInsights() { return pageSoon('insights', 'adminInsights', 7); }
+function pageContacts() { return pageSoon('contacts', 'adminContacts', 3); }
+
 // ── 관리: 메일 템플릿 ─────────────────────────────────────
 
 async function pageMailTemplates() {
-  app.innerHTML = shell('admin', `<h2 class="page-title">${esc(t('adminTitle'))}</h2>${adminTabs('mail')}<p class="lead">${esc(t('loading'))}</p>`);
+  app.innerHTML = shell('admin:mail', `<h2 class="page-title">${esc(t('adminMail'))}</h2><p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
   let data;
   try { data = await api('/api/admin/mail-templates'); } catch (err) { return handleError(err); }
   app.querySelector('main').innerHTML = `
-    <h2 class="page-title">${esc(t('adminTitle'))}</h2>
-    ${adminTabs('mail')}
+    <h2 class="page-title">${esc(t('adminMail'))}</h2>
     <p class="lead">${esc(t('mailTplLead'))}</p>
     <ul class="tpl-list">
       ${data.templates.map((tp) => `
@@ -969,7 +1042,7 @@ async function pageMailTemplates() {
 }
 
 async function pageMailEdit(key) {
-  app.innerHTML = shell('admin', `<p class="lead">${esc(t('loading'))}</p>`);
+  app.innerHTML = shell('admin:mail', `<p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
   let data;
   try { data = await api('/api/admin/mail-templates'); } catch (err) { return handleError(err); }
@@ -987,7 +1060,7 @@ async function pageMailEdit(key) {
     <a href="#/admin/mail" class="back-link">${ICONS.back}${esc(t('adminMail'))}</a>
     <h2 class="page-title">${esc(tp.label)}</h2>
     <p class="lead">${esc(tp.about)}</p>
-    <div class="tpl-edit">
+    <div class="tpl-edit wide">
       <form class="panel tpl-form" id="tpl-form" novalidate>
         <div class="tpl-vars">
           <span>${esc(t('mailTplVars'))}</span>
@@ -1075,7 +1148,7 @@ function adminTabs(active) {
 }
 
 async function pageUsers() {
-  app.innerHTML = shell('admin', `<h2 class="page-title">${esc(t('adminTitle'))}</h2>${adminTabs('users')}<p class="lead">${esc(t('loading'))}</p>`);
+  app.innerHTML = shell('admin:users', `<h2 class="page-title">${esc(t('adminUsers'))}</h2><p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
   let users, requests = [];
   try {
@@ -1110,10 +1183,9 @@ async function pageUsers() {
 
   app.querySelector('main').innerHTML = `
     <div class="page-head">
-      <div><h2 class="page-title">${esc(t('adminTitle'))}</h2><p class="lead">${esc(t('usersBody'))}</p></div>
+      <div><h2 class="page-title">${esc(t('adminUsers'))}</h2><p class="lead">${esc(t('usersBody'))}</p></div>
       <img src="/jina/present.png" alt="${esc(t('jinaPresentAlt'))}">
     </div>
-    ${adminTabs('users')}
     ${requests.length ? `<section class="panel signup-panel">
       <h2>${esc(t('signupRequests', { n: requests.length }))}</h2>
       <ul class="user-list">${requests.map((q) => `<li class="user-item" data-req="${esc(q.id)}">
@@ -1201,7 +1273,7 @@ function plain(html) {
 // ── 관리: 설정 ───────────────────────────────────────────
 
 async function pageSettings() {
-  app.innerHTML = shell('admin', `<h2 class="page-title">${esc(t('adminTitle'))}</h2>${adminTabs('settings')}<p class="lead">${esc(t('loading'))}</p>`);
+  app.innerHTML = shell('admin:settings', `<h2 class="page-title">${esc(t('adminSettings'))}</h2><p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
   let data;
   try { data = await api('/api/admin/settings'); }
@@ -1213,8 +1285,7 @@ async function pageSettings() {
     <p class="desc">${esc(desc)}</p></div>`;
 
   app.querySelector('main').innerHTML = `
-    <h2 class="page-title">${esc(t('adminTitle'))}</h2>
-    ${adminTabs('settings')}
+    <h2 class="page-title">${esc(t('adminSettings'))}</h2>
     <p class="lead">${esc(t('settingsBody'))}</p>
 
     <form class="panel" data-section="basic">
@@ -1456,11 +1527,13 @@ function bindCommon() {
 function openMenu(btn) {
   const u = state.user;
   const admin = u.role === 'admin';
+  const mode = location.hash.startsWith('#/admin') ? 'admin' : 'user';
+  const nav = navItems(mode);
   const here = location.hash || '#/';
-  const link = (href, icon, label, extra = '') =>
-    `<a href="${href}" class="menu-link" ${here === href ? 'aria-current="page"' : ''}>${icon}<span>${esc(label)}</span>${extra}</a>`;
+  const link = (it) =>
+    `<a href="${it.href}" class="menu-link" ${here === it.href ? 'aria-current="page"' : ''}>${it.icon}<span>${esc(it.label)}</span>${it.count ? '<span class="menu-count" data-signups hidden></span>' : ''}</a>`;
   const wrap = document.createElement('div');
-  wrap.className = 'drawer-wrap';
+  wrap.className = `drawer-wrap drawer-${mode}`;
   wrap.innerHTML = `
     <nav class="drawer" aria-label="${esc(t('menu'))}">
       <div class="drawer-head">
@@ -1468,16 +1541,10 @@ function openMenu(btn) {
         <div><div class="drawer-name">${esc(u.name || u.email.split('@')[0])}</div>
           <div class="drawer-role">${esc(admin ? t('roleAdmin') : t('roleTeacher'))}${u.position ? ' · ' + esc(u.position) : ''}</div></div>
       </div>
-      ${link('#/', ICONS.record, t('tabRecord'))}
-      ${link('#/records', ICONS.records, t('tabRecords'))}
-      ${admin ? `
-        <div class="menu-group">${esc(t('adminPage'))}</div>
-        ${link('#/admin/users', ICONS.admin, t('adminUsers'), '<span class="menu-count" data-signups hidden></span>')}
-        ${link('#/admin/mail', ICONS.mail, t('adminMail'))}
-        ${link('#/admin/settings', ICONS.gear, t('adminSettings'))}` : ''}
-      <div class="menu-group">${esc(t('tabMe'))}</div>
-      ${link('#/me', ICONS.me, t('myInfo'))}
-      <a href="/guide.html" class="menu-link">${ICONS.help}<span>${esc(t('guide'))}</span></a>
+      ${mode === 'admin' ? `<div class="menu-group">${esc(t('adminPage'))}</div>` : ''}
+      ${nav.main.map(link).join('')}
+      ${mode === 'user' ? `<a href="/guide" class="menu-link">${ICONS.help}<span>${esc(t('guide'))}</span></a>` : ''}
+      ${nav.switchTo ? `<div class="menu-sep"></div>${link(nav.switchTo)}` : ''}
       <button type="button" class="menu-link" data-act="menu-logout">${ICONS.logout}<span>${esc(t('logout'))}</span></button>
     </nav>`;
   document.body.appendChild(wrap);
@@ -1490,10 +1557,7 @@ function openMenu(btn) {
     wrap.remove(); state.user = null; location.hash = ''; renderLogin();
   });
   wrap.querySelector('.menu-link').focus();
-  if (admin) api('/api/admin/signups').then(({ requests }) => {
-    const el = wrap.querySelector('[data-signups]');
-    if (el && requests.length) { el.textContent = requests.length; el.hidden = false; el.setAttribute('aria-label', t('signupRequests', { n: requests.length })); }
-  }).catch(() => {});
+  if (admin) loadSignupCount();
 }
 
 function handleError(err) {
@@ -1513,6 +1577,8 @@ function render() {
   if (h === '/admin/users' && admin) return pageUsers();
   if (h === '/admin/settings' && admin) return pageSettings();
   if (h === '/admin/mail' && admin) return pageMailTemplates();
+  if (h === '/admin/insights' && admin) return pageInsights();
+  if (h === '/admin/contacts' && admin) return pageContacts();
   { const mk = h.match(/^\/admin\/mail\/([a-z_]+)$/); if (mk && admin) return pageMailEdit(mk[1]); }
   return pageRecord();
 }
