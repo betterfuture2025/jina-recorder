@@ -22,7 +22,15 @@ fallthrough = true
 binding = "DB"
 database_name = "jina-recorder-db"
 
-# 원본 녹음 저장소(R2)는 녹음을 실제로 쓰는 파트 2에서 붙인다.
+# 음성 → 글자 (Cloudflare Workers AI 의 Whisper, API 키 필요 없음)
+[ai]
+binding = "AI"
+
+# 원본 녹음 저장소(R2): 계정에서 R2 를 켠 뒤 아래 세 줄의 # 을 지우면 새 녹음부터 R2 에 저장된다.
+# 그전까지는 DB(chunk_data)에 저장한다.
+# [[r2_buckets]]
+# binding = "AUDIO"
+# bucket_name = "jina-recorder-audio"
 
 # 비밀값 (코드에 넣지 않고 Cloudflare에 따로 저장) — .dev.vars.example 참고
 #   ENC_KEY   — 설정에 저장하는 API 키를 잠그는 열쇠 (16자 이상 아무 문장, 한 번 정하면 바꾸지 않기)

@@ -32,7 +32,7 @@ export async function currentUser(env, request, ctx = {}) {
   if (!token) return null;
   const hash = await sha256Hex(token);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.role, u.picture, s.expires_at
+    `SELECT u.id, u.email, u.name, u.role, u.picture, u.last_name, u.first_name, u.first_name_en, u.last_name_en, u.position, u.phone, s.expires_at
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND u.active = 1 AND s.expires_at > datetime('now')`
   ).bind(hash).first();

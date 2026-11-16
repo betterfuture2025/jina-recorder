@@ -3,6 +3,7 @@ import { json, uid, readJson, normEmail, EMAIL_RE, HttpError, safeEqual } from '
 import { hasEncKey, isPlaceholder } from './crypto.js';
 import { saveSettings, listForAdmin, getSetting } from './settings.js';
 import { mailReady } from './mail.js';
+import { PROFILE_FIELDS, pickProfile, displayName } from './profile.js';
 import { redirectUri, createSession, testGoogleCredentials } from './auth.js';
 
 // ── 처음 설치 ───────────────────────────────────────────
@@ -55,7 +56,7 @@ export async function runSetup(env, request) {
 
 // ── 사용자 관리 ─────────────────────────────────────────
 
-const USER_COLS = 'id, email, name, role, active, picture, created_at, last_login_at';
+const USER_COLS = 'id, email, name, role, active, picture, created_at, last_login_at, ' + PROFILE_FIELDS.join(', ');
 
 export async function listUsers(env) {
   const { results } = await env.DB.prepare(
@@ -69,14 +70,19 @@ export async function addUser(env, request) {
   const email = normEmail(body.email);
   if (!EMAIL_RE.test(email)) throw new HttpError(400, 'bad_email', '이메일 형식을 확인해 주세요.');
   const role = body.role === 'admin' ? 'admin' : 'teacher';
+  const prof = pickProfile(body);
+  const name = displayName(prof, (body.name || '').trim() || null);
   const exists = await env.DB.prepare('SELECT id, active FROM users WHERE email = ?').bind(email).first();
   if (exists && exists.active) throw new HttpError(409, 'exists', '이미 등록된 이메일이에요.');
+  const vals = PROFILE_FIELDS.map((f) => prof[f] ?? null);
   if (exists) {
-    await env.DB.prepare('UPDATE users SET active = 1, role = ?, name = COALESCE(?, name) WHERE id = ?')
-      .bind(role, (body.name || '').trim() || null, exists.id).run();
+    await env.DB.prepare(
+      `UPDATE users SET active = 1, role = ?, name = COALESCE(?, name), ${PROFILE_FIELDS.map((f) => `${f} = COALESCE(?, ${f})`).join(', ')} WHERE id = ?`
+    ).bind(role, name, ...vals, exists.id).run();
   } else {
-    await env.DB.prepare('INSERT INTO users (id, email, name, role) VALUES (?, ?, ?, ?)')
-      .bind(uid(), email, (body.name || '').trim() || null, role).run();
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, name, role, ${PROFILE_FIELDS.join(', ')}) VALUES (?, ?, ?, ?, ${PROFILE_FIELDS.map(() => '?').join(', ')})`
+    ).bind(uid(), email, name, role, ...vals).run();
   }
   const user = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE email = ?`).bind(email).first();
   return json({ user }, 201);
@@ -89,7 +95,9 @@ export async function updateUser(env, request, me, id) {
 
   const role = body.role === undefined ? target.role : (body.role === 'admin' ? 'admin' : 'teacher');
   const active = body.active === undefined ? target.active : (body.active ? 1 : 0);
-  const name = body.name === undefined ? target.name : ((body.name || '').trim() || null);
+  const prof = { ...Object.fromEntries(PROFILE_FIELDS.map((f) => [f, target[f]])), ...pickProfile(body) };
+  let name = body.name === undefined ? target.name : ((body.name || '').trim() || null);
+  if (PROFILE_FIELDS.some((f) => body[f] !== undefined)) name = displayName(prof, name);
 
   const losingAdmin = target.role === 'admin' && target.active && (role !== 'admin' || !active);
   if (losingAdmin && (await adminCount(env)) <= 1) {
@@ -97,7 +105,9 @@ export async function updateUser(env, request, me, id) {
   }
   if (id === me.id && !active) throw new HttpError(400, 'self_disable', '내 계정은 끌 수 없어요.');
 
-  const stmts = [env.DB.prepare('UPDATE users SET role = ?, active = ?, name = ? WHERE id = ?').bind(role, active, name, id)];
+  const stmts = [env.DB.prepare(
+    `UPDATE users SET role = ?, active = ?, name = ?, ${PROFILE_FIELDS.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`
+  ).bind(role, active, name, ...PROFILE_FIELDS.map((f) => prof[f] ?? null), id)];
   if (!active) stmts.push(env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id));
   await env.DB.batch(stmts);
 
@@ -139,6 +149,19 @@ export async function putAdminSettings(env, request, me) {
 
 export async function testGoogle(env, request) {
   return json(await testGoogleCredentials(env, request));
+}
+
+// 내 정보 고치기 (이메일·권한은 못 바꿈)
+export async function updateMe(env, request, me) {
+  const body = await readJson(request);
+  const cur = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).bind(me.id).first();
+  const prof = { ...Object.fromEntries(PROFILE_FIELDS.map((f) => [f, cur[f]])), ...pickProfile(body) };
+  const name = displayName(prof, cur.name);
+  await env.DB.prepare(
+    `UPDATE users SET name = ?, ${PROFILE_FIELDS.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`
+  ).bind(name, ...PROFILE_FIELDS.map((f) => prof[f] ?? null), me.id).run();
+  const user = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).bind(me.id).first();
+  return json({ user });
 }
 
 // 누구나 볼 수 있는 기본 정보 (로그인 화면용)

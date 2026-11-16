@@ -3,12 +3,17 @@
 import { json, fail, HttpError, normEmail } from './util.js';
 import { ensureSchema } from './schema.js';
 import { startEmailLogin, verifyEmailLogin, testMail } from './emailLogin.js';
+import { submitSignup, listSignups, decideSignup } from './signup.js';
+import {
+  createRecording, putChunk, finishRecording, updateRecording, listRecordings, getRecording,
+  getChunkAudio, deleteRecording, retryStt,
+} from './recordings.js';
 import {
   currentUser, requireUser, requireAdmin, logout, startGoogleLogin, finishGoogleLogin, createSession,
 } from './auth.js';
 import {
   setupStatus, runSetup, listUsers, addUser, updateUser, deleteUser,
-  getAdminSettings, putAdminSettings, testGoogle, publicConfig,
+  getAdminSettings, putAdminSettings, testGoogle, publicConfig, updateMe,
 } from './admin.js';
 
 // 다른 사이트에서 몰래 요청을 보내는 것(CSRF)을 막는다.
@@ -56,6 +61,7 @@ async function route(request, env, ctx) {
   if (path === '/api/config' && m === 'GET') return publicConfig(env);
   if (path === '/api/setup/status' && m === 'GET') return setupStatus(env, request);
   if (path === '/api/setup' && m === 'POST') return runSetup(env, request);
+  if (path === '/api/signup' && m === 'POST') return submitSignup(env, request);
   if (path === '/api/login/email/start' && m === 'POST') return startEmailLogin(env, request);
   if (path === '/api/login/email/verify' && m === 'POST') return verifyEmailLogin(env, request);
 
@@ -65,12 +71,16 @@ async function route(request, env, ctx) {
     if (!user) return fail(401, 'login_required');
     return json({ user });
   }
+  if (path === '/api/me' && m === 'PATCH') return updateMe(env, request, await requireUser(env, request, ctx));
   if (path === '/api/logout' && m === 'POST') return logout(env, request);
 
   // ── 관리자 ──
   if (path.startsWith('/api/admin/')) {
     const me = await requireAdmin(env, request, ctx);
     if (path === '/api/admin/users' && m === 'GET') return listUsers(env);
+    if (path === '/api/admin/signups' && m === 'GET') return listSignups(env);
+    const sm = path.match(/^\/api\/admin\/signups\/([\w-]+)$/);
+    if (sm && m === 'POST') return decideSignup(env, request, me, sm[1]);
     if (path === '/api/admin/users' && m === 'POST') return addUser(env, request);
     const um = path.match(/^\/api\/admin\/users\/([\w-]+)$/);
     if (um && m === 'PATCH') return updateUser(env, request, me, um[1]);
@@ -81,7 +91,24 @@ async function route(request, env, ctx) {
     if (path === '/api/admin/settings/test-mail' && m === 'POST') return testMail(env, me);
   }
 
-  // 파트 2 이후 기능은 로그인 확인만 해 두고 아직 없음
+  // ── 녹음 (로그인한 사람) ──
+  if (path.startsWith('/api/recordings')) {
+    const user = await requireUser(env, request, ctx);
+    if (path === '/api/recordings' && m === 'GET') return listRecordings(env, request, user);
+    if (path === '/api/recordings' && m === 'POST') return createRecording(env, request, user);
+    const rm = path.match(/^\/api\/recordings\/([\w-]{36})(?:\/(chunks\/(\d+)|finish|retry-stt))?$/);
+    if (rm) {
+      const [, id, sub, seq] = rm;
+      if (!sub && m === 'GET') return getRecording(env, user, id);
+      if (!sub && m === 'PATCH') return updateRecording(env, request, user, id);
+      if (!sub && m === 'DELETE') return deleteRecording(env, user, id);
+      if (seq !== undefined && m === 'PUT') return putChunk(env, request, user, id, seq);
+      if (seq !== undefined && m === 'GET') return getChunkAudio(env, user, id, seq);
+      if (sub === 'finish' && m === 'POST') return finishRecording(env, request, user, id);
+      if (sub === 'retry-stt' && m === 'POST') return retryStt(env, user, id);
+    }
+  }
+
   await requireUser(env, request, ctx);
   return fail(404, 'not_found', '없는 주소예요.');
 }

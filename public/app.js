@@ -1,5 +1,6 @@
-// 지나기록기 — 화면 (파트 1: 로그인, 처음 설치, 홈, 기록, 관리, 내 정보)
+// 지나기록기 — 화면 (로그인, 처음 설치, 녹음, 기록, 관리, 내 정보)
 import { t, esc, getLang, setLang } from './i18n.js';
+import { ChunkRecorder, UploadQueue, supported as recSupported } from './recorder.js';
 
 const app = document.getElementById('app');
 const state = { user: null, config: { appName: '지나기록기', googleReady: false }, redirectUri: '' };
@@ -51,6 +52,79 @@ function avatar(u) {
   return `<span class="avatar" aria-hidden="true">${initials(u)}</span>`;
 }
 
+// 2026.11.16 (월) 오후 3:10 — 기록에 쓰는 날짜 형식
+function sqlDate(sqlTime) {
+  return new Date(String(sqlTime).replace(' ', 'T') + (String(sqlTime).includes('Z') ? '' : 'Z'));
+}
+function fmtStamp(input, { time = true } = {}) {
+  if (!input) return '';
+  const d = input instanceof Date ? input : sqlDate(input);
+  const ko = getLang() === 'ko';
+  const p2 = (n) => String(n).padStart(2, '0');
+  const days = ko ? ['일', '월', '화', '수', '목', '금', '토'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let s = `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} (${days[d.getDay()]})`;
+  if (time) {
+    const h = d.getHours(), m = p2(d.getMinutes());
+    s += ko ? ` ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${m}` : ` ${h % 12 || 12}:${m} ${h < 12 ? 'am' : 'pm'}`;
+  }
+  return s;
+}
+function fmtClock(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const p2 = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${p2(m)}:${p2(sec)}` : `${p2(m)}:${p2(sec)}`;
+}
+function fmtDur(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (getLang() === 'ko') return h ? `${h}시간 ${m}분` : m ? `${m}분` : `${s}초`;
+  return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+}
+// 사용자 정보 칸 (성·이름·영어 이름·영어 성·직책·전화번호)
+function profileFields(v = {}, { required = false } = {}) {
+  const f = (name, label, attrs = '') => `<label class="field"><span>${esc(t(label))}</span>
+    <input name="${name}" type="text" value="${esc(v[name] || '')}" ${attrs}></label>`;
+  return `
+    <div class="row">${f('last_name', 'lastName', `autocomplete="family-name" ${required ? 'required' : ''}`)}${f('first_name', 'firstName', `autocomplete="given-name" ${required ? 'required' : ''}`)}</div>
+    <div class="row">${f('first_name_en', 'firstNameEn', 'autocomplete="off" lang="en"')}${f('last_name_en', 'lastNameEn', 'autocomplete="off" lang="en"')}</div>
+    ${f('position', 'position', `placeholder="${esc(t('positionPh'))}"`)}
+    <label class="field"><span>${esc(t('phone'))}</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(v.phone || '')}" placeholder="04xx xxx xxx"></label>`;
+}
+function enName(u) { return `${u.first_name_en || ''} ${u.last_name_en || ''}`.trim(); }
+
+function editUserSheet(u, onSaved) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  wrap.innerHTML = `
+    <form class="sheet" role="dialog" aria-modal="true" aria-labelledby="eu-title" novalidate>
+      <h2 id="eu-title">${esc(t('editInfo'))}</h2>
+      <p>${esc(u.email)}</p>
+      ${profileFields(u)}
+      <div id="eu-error"></div>
+      <div class="row">
+        <button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
+        <button type="submit" class="btn btn-primary">${esc(t('save'))}</button>
+      </div>
+    </form>`;
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  const form = wrap.querySelector('form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: Object.fromEntries(new FormData(form)) });
+      close(); toast(t('saved')); onSaved();
+    } catch (err) { wrap.querySelector('#eu-error').innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+  });
+  form.querySelector('input').focus();
+}
+
+const KIND_KEYS = { memo: 'kindMemo', meeting: 'kindMeeting', consult: 'kindConsult', unassigned: 'unassigned' };
+const kindLabel = (k) => t(KIND_KEYS[k] || 'unassigned');
+
 function when(sqlTime) {
   if (!sqlTime) return '';
   const d = new Date(sqlTime.replace(' ', 'T') + 'Z');
@@ -77,6 +151,10 @@ const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><re
 const GOOGLE_G = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
 const ICONS = {
+  pause: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
+  play: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>`,
+  stop: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>`,
+  back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
   mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>`,
   memo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/></svg>`,
   meeting: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.8-3 2.8-4.5 5-4.5s4.2 1.5 5 4.5M11 19c.8-3 2.8-4.5 5-4.5s4.2 1.5 5 4.5"/></svg>`,
@@ -138,6 +216,7 @@ function renderLogin() {
         </form>` : ''}
         ${state.config.emailReady && state.config.googleReady ? `<div class="or"><span>${esc(t('or'))}</span></div>` : ''}
         ${state.config.googleReady || !state.config.emailReady ? `<a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>` : ''}
+        <p class="signup-cta">${esc(t('noAccount'))} <a href="#/signup">${esc(t('signupLink'))}</a></p>
         <p class="login-foot">${esc(t('loginOnlyAllowed'))} <a href="/privacy.html">${esc(t('privacy'))}</a></p>
       </div>
     </div>`;
@@ -199,6 +278,50 @@ function bindEmailLogin() {
   verify.querySelector('[data-act=change-email]').addEventListener('click', () => {
     verify.hidden = true; start.hidden = false; show('');
     start.querySelector('[name=email]').focus();
+  });
+}
+
+// ── 가입 신청 ─────────────────────────────────────────────
+
+function renderSignup(done) {
+  app.innerHTML = `
+    <div class="login">
+      <div class="login-top">
+        <a class="brand" href="#/" style="text-decoration:none;color:inherit">${LOGO}<span>${esc(state.config.appName)}</span></a>
+        ${langButton()}
+      </div>
+      <div class="login-body">
+        ${done ? `
+          <div class="jina-hero"><img src="/jina/thumbs.png" alt="${esc(t('jinaThumbsAlt'))}"></div>
+          <h1>${esc(t('signupDoneTitle'))}</h1>
+          <p>${esc(t('signupDoneBody'))}</p>
+          <a class="btn btn-primary btn-block" href="#/">${esc(t('backToLogin'))}</a>` : `
+          <h1>${esc(t('signupTitle'))}</h1>
+          <p>${esc(t('signupBody'))}</p>
+          <div id="signup-msg"></div>
+          <form id="signup" novalidate>
+            ${profileFields({}, { required: true })}
+            <label class="field"><span>${esc(t('emailLabel'))}</span><input name="email" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com"></label>
+            <label class="field"><span>${esc(t('signupNote'))}</span><input name="note" type="text" placeholder="${esc(t('signupNotePh'))}"></label>
+            <button class="btn btn-primary btn-block" type="submit">${esc(t('signupSubmit'))}</button>
+          </form>
+          <p class="signup-cta"><a href="#/">${esc(t('backToLogin'))}</a></p>`}
+      </div>
+    </div>`;
+  bindLang(app, () => renderSignup(done));
+  const form = app.querySelector('#signup');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true;
+    try {
+      await api('/api/signup', { method: 'POST', body: Object.fromEntries(new FormData(form)) });
+      renderSignup(true);
+    } catch (err) {
+      app.querySelector('#signup-msg').innerHTML = `<div class="notice error" role="alert">${esc(err.message)}</div>`;
+      btn.disabled = false;
+    }
   });
 }
 
@@ -317,30 +440,333 @@ function pageRecord() {
       <button class="kind-btn" type="button" data-kind="meeting">${ICONS.meeting}${esc(t('kindMeeting'))}</button>
       <button class="kind-btn" type="button" data-kind="consult">${ICONS.consult}${esc(t('kindConsult'))}</button>
     </div>
-    <section class="section">
+    <section class="section" id="recent">
       <div class="empty-jina">
         <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('homeEmptyBody'))}</p></div>
         <img src="/jina/point.png" alt="${esc(t('jinaPointAlt'))}">
       </div>
     </section>`);
   bindCommon();
-  // 파트 2에서 실제 녹음으로 바뀐다.
-  app.querySelectorAll('[data-act="quick-record"], [data-kind]').forEach((b) =>
-    b.addEventListener('click', () => toast(t('recordComingSoon')))
-  );
+  app.querySelector('[data-act="quick-record"]').addEventListener('click', () => beginRecording('unassigned'));
+  app.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => beginRecording(b.dataset.kind)));
+  loadRecent();
+}
+
+async function loadRecent() {
+  let items;
+  try { ({ items } = await api('/api/recordings?limit=3')); } catch { return; }
+  const box = app.querySelector('#recent');
+  if (!box || !items.length) return;
+  box.innerHTML = `
+    <div class="section-head"><h2>${esc(t('recentTitle'))}</h2><a href="#/records" class="link-btn">${esc(t('seeAll'))}</a></div>
+    <ul class="rec-list">${items.map(recCard).join('')}</ul>`;
+}
+
+function recCard(r) {
+  const title = r.title || (r.kind === 'unassigned' ? t('untitled') : kindLabel(r.kind));
+  const live = r.status === 'recording';
+  return `<li><a class="rec-card" href="#/r/${esc(r.id)}">
+    <div class="rec-card-top">
+      <span class="kind-badge kind-${esc(r.kind)}">${esc(kindLabel(r.kind))}</span>
+      <span class="rec-card-when">${esc(fmtStamp(r.started_at))}</span>
+    </div>
+    <div class="rec-card-title">${esc(title)}</div>
+    ${r.snippet ? `<p class="rec-card-snippet">${esc(r.snippet)}</p>` : ''}
+    <div class="rec-card-meta">${live ? `<span class="live-dot"></span>${esc(t('stillRecording'))}` : esc(fmtDur(r.duration_sec))}${state.user.role === 'admin' && r.owner_email !== state.user.email ? ` · ${esc(r.owner_name || r.owner_email)}` : ''}</div>
+  </a></li>`;
 }
 
 // ── 기록 ─────────────────────────────────────────────────
 
-function pageRecords() {
+let recordsFilter = '';
+async function pageRecords() {
+  const filters = [['', 'all'], ['consult', 'kindConsult'], ['meeting', 'kindMeeting'], ['memo', 'kindMemo'], ['unassigned', 'unassigned']];
   app.innerHTML = shell('records', `
     <h2 class="page-title">${esc(t('recordsTitle'))}</h2>
-    <div class="empty-jina">
+    <div class="chips" role="group" aria-label="${esc(t('recordsTitle'))}">
+      ${filters.map(([k, key]) => `<button type="button" class="chip" data-filter="${k}" aria-pressed="${recordsFilter === k}">${esc(t(key))}</button>`).join('')}
+    </div>
+    <div id="list"><p class="lead">${esc(t('loading'))}</p></div>`);
+  bindCommon();
+  app.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { recordsFilter = b.dataset.filter; pageRecords(); }));
+  let items;
+  try {
+    const q = new URLSearchParams({ limit: '100' });
+    if (recordsFilter) q.set('kind', recordsFilter);
+    if (state.user.role === 'admin') q.set('all', '1');
+    ({ items } = await api('/api/recordings?' + q));
+  } catch (err) { return handleError(err); }
+  const list = app.querySelector('#list');
+  if (!list) return;
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-jina">
       <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('recordsEmptyBody'))}</p>
         <a class="btn btn-primary" href="#/">${esc(t('goRecord'))}</a></div>
       <img src="/jina/think.png" alt="${esc(t('jinaThinkAlt'))}">
-    </div>`);
+    </div>`;
+    return;
+  }
+  list.innerHTML = `<ul class="rec-list">${items.map(recCard).join('')}</ul>`;
+}
+
+// ── 기록 상세 ─────────────────────────────────────────────
+
+async function pageRecordDetail(id) {
+  app.innerHTML = shell('records', `<p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
+  let data;
+  try { data = await api(`/api/recordings/${id}`); }
+  catch (err) { if (err.status === 404) { toast(err.message); location.hash = '#/records'; return; } return handleError(err); }
+  const r = data.recording;
+  const chunks = data.chunks;
+  const failed = chunks.filter((c) => c.status === 'failed' || c.status === 'pending').length;
+  const kinds = ['consult', 'meeting', 'memo', 'unassigned'];
+  const text = chunks.map((c) => `
+    <li class="line" data-seq="${c.seq}">
+      <button type="button" class="line-time" data-play="${c.seq}" aria-label="${esc(t('playFrom', { time: fmtClock(c.start_ms || 0) }))}">${fmtClock(c.start_ms || 0)}</button>
+      <p class="${c.status === 'done' ? '' : 'muted'}">${c.status === 'done' ? esc(c.text) : esc(t(c.status === 'empty' ? 'chunkEmpty' : c.status === 'failed' ? 'chunkFailed' : 'chunkPending'))}</p>
+    </li>`).join('');
+
+  app.querySelector('main').innerHTML = `
+    <a href="#/records" class="back-link">${ICONS.back}${esc(t('recordsTitle'))}</a>
+    <div class="detail-when">${esc(fmtStamp(r.started_at))}${r.duration_sec ? ` · ${esc(fmtDur(r.duration_sec))}` : ''}${r.owner_email !== state.user.email ? ` · ${esc(r.owner_name || r.owner_email)}` : ''}</div>
+    <label class="visually-hidden" for="rec-title">${esc(t('titleLabel'))}</label>
+    <input id="rec-title" class="title-input" type="text" maxlength="120" value="${esc(r.title || '')}" placeholder="${esc(t('titlePlaceholder'))}">
+    <div class="chips" role="group" aria-label="${esc(t('kindLabel'))}">
+      ${kinds.map((k) => `<button type="button" class="chip" data-kind="${k}" aria-pressed="${r.kind === k}">${esc(kindLabel(k))}</button>`).join('')}
+    </div>
+    ${r.kind === 'consult' ? `<label class="consent-row"><input type="checkbox" id="consent" ${r.consent ? 'checked' : ''}> <span>${esc(t('consentDone'))}</span></label>` : ''}
+    ${r.status === 'recording' ? `<div class="notice warn">${esc(t('detailStillRecording'))}</div>` : ''}
+
+    <div class="player">
+      <button type="button" class="btn btn-primary" data-act="play-all" ${chunks.length ? '' : 'disabled'}>${ICONS.play}<span>${esc(t('playAll'))}</span></button>
+      <span class="player-status" aria-live="polite"></span>
+      <audio id="player" preload="none"></audio>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><h2>${esc(t('transcript'))}</h2>
+        ${failed ? `<button type="button" class="link-btn" data-act="retry">${esc(t('retryStt', { n: failed }))}</button>` : ''}</div>
+      ${chunks.length ? `<ol class="transcript">${text}</ol>` : `<p class="lead">${esc(t('noChunks'))}</p>`}
+    </section>
+
+    <div class="section"><button type="button" class="btn btn-danger btn-block" data-act="delete">${esc(t('deleteRecording'))}</button></div>`;
+
+  const save = async (patch) => {
+    try { await api(`/api/recordings/${id}`, { method: 'PATCH', body: patch }); toast(t('saved')); }
+    catch (err) { toast(err.message); }
+  };
+  const titleEl = app.querySelector('#rec-title');
+  titleEl.addEventListener('change', () => save({ title: titleEl.value }));
+  app.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', async () => { await save({ kind: b.dataset.kind }); pageRecordDetail(id); }));
+  const consentEl = app.querySelector('#consent');
+  if (consentEl) consentEl.addEventListener('change', () => save({ consent: consentEl.checked }));
+
+  // 다시 듣기: 조각을 차례로 이어서 재생
+  const player = app.querySelector('#player');
+  const status = app.querySelector('.player-status');
+  const seqs = chunks.map((c) => c.seq);
+  let idx = -1;
+  const mark = (seq) => app.querySelectorAll('.line').forEach((li) => li.classList.toggle('playing', Number(li.dataset.seq) === seq));
+  const playAt = (i) => {
+    if (i < 0 || i >= seqs.length) { idx = -1; mark(-1); status.textContent = ''; return; }
+    idx = i;
+    player.src = `/api/recordings/${id}/chunks/${seqs[i]}`;
+    player.play().catch(() => {});
+    mark(seqs[i]);
+    status.textContent = t('playingPart', { n: i + 1, total: seqs.length });
+  };
+  player.addEventListener('ended', () => playAt(idx + 1));
+  app.querySelector('[data-act="play-all"]').addEventListener('click', () => {
+    if (idx >= 0 && !player.paused) { player.pause(); status.textContent = t('paused'); return; }
+    if (idx >= 0 && player.paused) { player.play(); status.textContent = t('playingPart', { n: idx + 1, total: seqs.length }); return; }
+    playAt(0);
+  });
+  app.querySelectorAll('[data-play]').forEach((b) => b.addEventListener('click', () => playAt(seqs.indexOf(Number(b.dataset.play)))));
+
+  const retry = app.querySelector('[data-act="retry"]');
+  if (retry) retry.addEventListener('click', async () => {
+    retry.disabled = true; retry.textContent = t('retrying');
+    try { const res = await api(`/api/recordings/${id}/retry-stt`, { method: 'POST' }); toast(t('retryDone', { n: res.fixed })); }
+    catch (err) { toast(err.message); }
+    pageRecordDetail(id);
+  });
+  app.querySelector('[data-act="delete"]').addEventListener('click', async () => {
+    if (!confirm(t('confirmDeleteRecording'))) return;
+    try { await api(`/api/recordings/${id}`, { method: 'DELETE' }); toast(t('deleted')); location.hash = '#/records'; }
+    catch (err) { toast(err.message); }
+  });
+}
+
+// ── 녹음하기 ─────────────────────────────────────────────
+
+function beginRecording(kind) {
+  if (!recSupported()) return toast(t('recNotSupported'));
+  if (kind === 'consult') return consentSheet(() => startRecording(kind, true));
+  startRecording(kind, false);
+}
+
+function consentSheet(onOk) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  wrap.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <h2 id="sheet-title">${esc(t('consentTitle'))}</h2>
+      <p>${esc(t('consentBody'))}</p>
+      <label class="consent-row"><input type="checkbox" id="consent-ok"> <span>${esc(t('consentCheck'))}</span></label>
+      <div class="row">
+        <button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
+        <button type="button" class="btn btn-primary" data-act="ok" disabled>${esc(t('startRecording'))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const ok = wrap.querySelector('[data-act="ok"]');
+  wrap.querySelector('#consent-ok').addEventListener('change', (e) => { ok.disabled = !e.target.checked; });
+  const close = () => wrap.remove();
+  wrap.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  ok.addEventListener('click', () => { close(); onOk(); });
+  wrap.querySelector('#consent-ok').focus();
+}
+
+let session = null; // 지금 녹음 중인 것
+
+async function startRecording(kind, consent) {
+  const startedAt = new Date();
+  let id;
+  try {
+    ({ id } = await api('/api/recordings', { method: 'POST', body: { kind, consent, startedAt: startedAt.toISOString() } }));
+  } catch (err) { return handleError(err); }
+
+  const lines = new Map(); // seq → { startMs, status, text }
+  const s = session = { id, kind, startedAt, lines, wakeLock: null, finished: false };
+
+  const renderLines = () => {
+    const box = app.querySelector('#live-lines');
+    if (!box) return;
+    const arr = [...lines.entries()].sort((a, b) => a[0] - b[0]);
+    box.innerHTML = arr.length ? arr.map(([, l]) => `
+      <li><span class="line-time-static">${fmtClock(l.startMs)}</span>
+        <p class="${l.status === 'done' ? '' : 'muted'}">${l.status === 'done' ? esc(l.text) : esc(t(l.status === 'empty' ? 'chunkEmpty' : l.status === 'failed' ? 'chunkFailed' : 'chunkPending'))}</p></li>`).join('')
+      : `<li class="live-hint">${esc(t('liveHint'))}</li>`;
+    const card = app.querySelector('.live-card');
+    if (card) card.scrollTop = card.scrollHeight;
+  };
+  const renderQueue = (q) => {
+    const el = app.querySelector('#upload-state');
+    if (!el) return;
+    const waiting = q.items.filter((i) => !i.done && i.tries > 0).length;
+    el.textContent = waiting ? t('uploadRetrying', { n: waiting }) : q.pending ? t('uploading', { n: q.pending }) : '';
+  };
+
+  const queue = s.queue = new UploadQueue({
+    upload: async (item) => {
+      const res = await fetch(`/api/recordings/${id}/chunks/${item.seq}`, {
+        method: 'PUT', credentials: 'same-origin',
+        headers: { 'x-requested-with': 'fetch', 'content-type': item.type, 'x-start-ms': String(item.startMs), 'x-end-ms': String(item.endMs) },
+        body: item.blob,
+      });
+      if (res.status === 401) { throw Object.assign(new Error('login'), { status: 401 }); }
+      if (!res.ok) throw new Error('upload ' + res.status);
+      const data = await res.json();
+      lines.set(item.seq, { startMs: item.startMs, status: data.status, text: data.text });
+      renderLines();
+      return data;
+    },
+    onUpdate: renderQueue,
+  });
+
+  const rec = s.rec = new ChunkRecorder({
+    chunkMs: 20000,
+    onChunk: (c) => {
+      lines.set(c.seq, { startMs: c.startMs, status: 'pending', text: '' });
+      renderLines();
+      queue.add(c);
+    },
+    onLevel: (level) => {
+      const bars = app.querySelectorAll('.meter i');
+      bars.forEach((b, i) => {
+        const shape = 0.35 + 0.65 * Math.abs(Math.sin((i + 1) * 1.7 + performance.now() / 260));
+        b.style.transform = `scaleY(${Math.max(0.12, level * shape)})`;
+      });
+    },
+    onState: (st) => {
+      const pauseBtn = app.querySelector('[data-act="pause"]');
+      if (pauseBtn) {
+        pauseBtn.innerHTML = st === 'paused' ? ICONS.play : ICONS.pause;
+        pauseBtn.setAttribute('aria-label', t(st === 'paused' ? 'resume' : 'pause'));
+      }
+      const label = app.querySelector('#rec-state');
+      if (label) label.textContent = st === 'paused' ? t('pausedLabel') : t('recordingLabel', { kind: kind === 'unassigned' ? '' : kindLabel(kind) + ' ' });
+      app.querySelector('.rec-screen')?.classList.toggle('is-paused', st === 'paused');
+    },
+  });
+
+  app.innerHTML = `
+    <div class="rec-screen">
+      <div class="rec-top">
+        <div class="rec-state"><span class="live-dot"></span><span id="rec-state">${esc(t('recordingLabel', { kind: kind === 'unassigned' ? '' : kindLabel(kind) + ' ' }))}</span></div>
+        <span class="rec-keep">${esc(t('keepScreenOn'))}</span>
+      </div>
+      <div class="rec-center">
+        <div class="rec-date">${esc(t('startedAt', { when: fmtStamp(startedAt) }))}</div>
+        <div class="rec-clock" id="clock">00:00</div>
+        <div class="kind-pill">${esc(kindLabel(kind))}</div>
+        <div class="meter" aria-hidden="true">${'<i></i>'.repeat(15)}</div>
+      </div>
+      <div class="live-card">
+        <div class="live-head"><span>${esc(t('liveTitle'))}</span><span id="upload-state"></span></div>
+        <ol class="live-lines" id="live-lines"><li class="live-hint">${esc(t('liveHint'))}</li></ol>
+      </div>
+      <div class="rec-controls">
+        <button type="button" class="round-btn" data-act="pause" aria-label="${esc(t('pause'))}">${ICONS.pause}</button>
+        <button type="button" class="stop-btn" data-act="stop">${ICONS.stop}<span>${esc(t('stopAndSave'))}</span></button>
+      </div>
+    </div>`;
+
+  try {
+    await rec.start();
+  } catch (err) {
+    session = null;
+    await api(`/api/recordings/${id}`, { method: 'DELETE' }).catch(() => {});
+    toast(err && err.name === 'NotAllowedError' ? t('micDenied') : t('micError'));
+    return render();
+  }
+
+  // 화면 꺼짐 방지
+  const lock = async () => {
+    try { if ('wakeLock' in navigator && document.visibilityState === 'visible') s.wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+  };
+  lock();
+  s.onVis = () => { if (document.visibilityState === 'visible' && !s.finished) lock(); };
+  document.addEventListener('visibilitychange', s.onVis);
+  s.onUnload = (e) => { if (!s.finished) { e.preventDefault(); e.returnValue = ''; } };
+  window.addEventListener('beforeunload', s.onUnload);
+
+  const clock = app.querySelector('#clock');
+  s.clockTimer = setInterval(() => { clock.textContent = fmtClock(rec.elapsedMs()); }, 250);
+
+  app.querySelector('[data-act="pause"]').addEventListener('click', () => (rec.state === 'paused' ? rec.resume() : rec.pause()));
+  app.querySelector('[data-act="stop"]').addEventListener('click', (e) => finishRecording(e.currentTarget));
+}
+
+async function finishRecording(btn) {
+  const s = session;
+  if (!s || s.finished) return;
+  btn.disabled = true;
+  btn.querySelector('span').textContent = t('finishing');
+  await s.rec.stop();
+  clearInterval(s.clockTimer);
+  const allUp = await s.queue.drain(90000);
+  s.finished = true;
+  try { await api(`/api/recordings/${s.id}/finish`, { method: 'POST', body: { durationSec: s.rec.elapsedMs() / 1000 } }); } catch {}
+  try { s.wakeLock && s.wakeLock.release(); } catch {}
+  document.removeEventListener('visibilitychange', s.onVis);
+  window.removeEventListener('beforeunload', s.onUnload);
+  session = null;
+  if (!allUp) toast(t('someNotUploaded'));
+  location.hash = `#/r/${s.id}`;
+  render();
 }
 
 // ── 관리: 사용자 ──────────────────────────────────────────
@@ -355,9 +781,10 @@ function adminTabs(active) {
 async function pageUsers() {
   app.innerHTML = shell('admin', `<h2 class="page-title">${esc(t('adminTitle'))}</h2>${adminTabs('users')}<p class="lead">${esc(t('loading'))}</p>`);
   bindCommon();
-  let users;
-  try { ({ users } = await api('/api/admin/users')); }
-  catch (err) { return handleError(err); }
+  let users, requests = [];
+  try {
+    [{ users }, { requests }] = await Promise.all([api('/api/admin/users'), api('/api/admin/signups')]);
+  } catch (err) { return handleError(err); }
 
   const me = state.user.id;
   const item = (u) => {
@@ -371,9 +798,12 @@ async function pageUsers() {
           ${off ? `<span class="badge off">${esc(t('inactive'))}</span>` : ''}
           ${u.id === me ? `<span class="badge me">${esc(t('you'))}</span>` : ''}
         </div>
+        ${enName(u) ? `<div class="user-en">${esc(enName(u))}</div>` : ''}
+        ${u.position || u.phone ? `<div class="user-meta">${[u.position, u.phone].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
         <div class="user-mail">${esc(u.email)}</div>
         <div class="user-meta">${meta}</div>
-        ${u.id === me ? '' : `<div class="user-actions">
+        ${u.id === me ? `<div class="user-actions"><button class="btn btn-quiet btn-small" data-act="edit">${esc(t('editInfo'))}</button></div>` : `<div class="user-actions">
+          <button class="btn btn-quiet btn-small" data-act="edit">${esc(t('editInfo'))}</button>
           <button class="btn btn-quiet btn-small" data-act="role" data-role="${u.role === 'admin' ? 'teacher' : 'admin'}">${esc(u.role === 'admin' ? t('makeTeacher') : t('makeAdmin'))}</button>
           <button class="btn btn-quiet btn-small" data-act="active" data-active="${off ? 1 : 0}">${esc(off ? t('turnOn') : t('turnOff'))}</button>
           <button class="btn btn-danger btn-small" data-act="remove">${esc(t('remove'))}</button>
@@ -388,18 +818,43 @@ async function pageUsers() {
       <img src="/jina/present.png" alt="${esc(t('jinaPresentAlt'))}">
     </div>
     ${adminTabs('users')}
+    ${requests.length ? `<section class="panel signup-panel">
+      <h2>${esc(t('signupRequests', { n: requests.length }))}</h2>
+      <ul class="user-list">${requests.map((q) => `<li class="user-item" data-req="${esc(q.id)}">
+        <span class="avatar" aria-hidden="true">${esc((q.name || '?').charAt(0))}</span>
+        <div><div class="user-name">${esc(q.name)}</div>${enName(q) ? `<div class="user-en">${esc(enName(q))}</div>` : ''}
+          ${q.position || q.phone ? `<div class="user-meta">${[q.position, q.phone].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
+          <div class="user-mail">${esc(q.email)}</div>
+          <div class="user-meta">${esc(fmtStamp(q.created_at))}${q.note ? ` · ${esc(q.note)}` : ''}</div>
+          <div class="user-actions">
+            <button class="btn btn-primary btn-small" data-decide="1">${esc(t('approve'))}</button>
+            <button class="btn btn-quiet btn-small" data-decide="0">${esc(t('reject'))}</button>
+          </div></div></li>`).join('')}</ul>
+    </section>` : ''}
+
+    <section class="section"><div class="panel"><ul class="user-list">${users.map(item).join('')}</ul></div></section>
+    <section class="section">
     <form class="panel" id="add-user" novalidate>
       <h2>${esc(t('addUser'))}</h2>
-      <label class="field"><span>${esc(t('email'))}</span><input name="email" type="email" inputmode="email" autocomplete="off" required placeholder="name@gmail.com"></label>
+      ${profileFields()}
       <div class="row">
-        <label class="field"><span>${esc(t('name'))}</span><input name="name" type="text"></label>
-        <label class="field shrink" style="width:9.5em"><span>${esc(t('role'))}</span>
+        <label class="field"><span>${esc(t('email'))}</span><input name="email" type="email" inputmode="email" autocomplete="off" required placeholder="name@example.com"></label>
+        <label class="field shrink" style="width:8.5em"><span>${esc(t('role'))}</span>
           <select name="role"><option value="teacher">${esc(t('roleTeacher'))}</option><option value="admin">${esc(t('roleAdmin'))}</option></select></label>
       </div>
       <div id="add-error"></div>
       <button class="btn btn-primary" type="submit">${esc(t('add'))}</button>
     </form>
-    <section class="section"><div class="panel"><ul class="user-list">${users.map(item).join('')}</ul></div></section>`;
+    </section>`;
+
+  app.querySelectorAll('[data-decide]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.closest('[data-req]').dataset.req;
+    try {
+      const r = await api(`/api/admin/signups/${id}`, { method: 'POST', body: { approve: b.dataset.decide === '1' } });
+      toast(r.approved ? t('approved') : t('rejected'));
+      pageUsers();
+    } catch (err) { toast(err.message); }
+  }));
 
   const form = app.querySelector('#add-user');
   form.addEventListener('submit', async (e) => {
@@ -418,7 +873,9 @@ async function pageUsers() {
     const li = b.closest('.user-item');
     const id = li.dataset.id;
     try {
-      if (b.dataset.act === 'role') {
+      if (b.dataset.act === 'edit') {
+        return editUserSheet(users.find((x) => x.id === id), () => pageUsers());
+      } else if (b.dataset.act === 'role') {
         await api(`/api/admin/users/${id}`, { method: 'PATCH', body: { role: b.dataset.role } });
         toast(t('saved'));
       } else if (b.dataset.act === 'active') {
@@ -566,6 +1023,12 @@ function pageMe() {
       <div class="profile-name">${esc(u.name || u.email.split('@')[0])}</div>
       <div class="profile-mail">${esc(u.email)} · ${esc(u.role === 'admin' ? t('roleAdmin') : t('roleTeacher'))}</div>
     </div></div>
+    <form class="panel" id="my-info" novalidate>
+      <h2>${esc(t('myInfo'))}</h2>
+      ${profileFields(u)}
+      <div id="me-error"></div>
+      <button class="btn btn-primary" type="submit">${esc(t('save'))}</button>
+    </form>
     <div class="panel">
       <h2>${esc(t('language'))}</h2>
       <div class="seg" role="group" aria-label="${esc(t('language'))}">
@@ -581,6 +1044,15 @@ function pageMe() {
     <div class="section"><button class="btn btn-quiet btn-block" data-act="logout" type="button">${esc(t('logout'))}</button></div>`);
   bindCommon();
   app.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); pageMe(); }));
+  const myInfo = app.querySelector('#my-info');
+  myInfo.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const { user } = await api('/api/me', { method: 'PATCH', body: Object.fromEntries(new FormData(myInfo)) });
+      state.user = { ...state.user, ...user };
+      toast(t('saved')); pageMe();
+    } catch (err) { app.querySelector('#me-error').innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+  });
   app.querySelector('[data-act="logout"]').addEventListener('click', async () => {
     try { await api('/api/logout', { method: 'POST' }); } catch {}
     state.user = null;
@@ -606,8 +1078,11 @@ function handleError(err) {
 }
 
 function render() {
-  if (!state.user) return renderLogin();
+  if (!state.user) return location.hash === '#/signup' ? renderSignup() : renderLogin();
+  if (session && !session.finished) return; // 녹음 중에는 녹음 화면 유지
   const h = location.hash.replace(/^#/, '') || '/';
+  const detail = h.match(/^\/r\/([\w-]{36})$/);
+  if (detail) return pageRecordDetail(detail[1]);
   const admin = state.user.role === 'admin';
   if (h === '/records') return pageRecords();
   if (h === '/me') return pageMe();
@@ -616,7 +1091,11 @@ function render() {
   return pageRecord();
 }
 
-window.addEventListener('hashchange', () => { if (state.user) render(); });
+window.addEventListener('hashchange', () => {
+  if (state.user) render();
+  else if (location.hash === '#/signup') renderSignup();
+  else renderLogin();
+});
 
 async function boot() {
   try {

@@ -163,3 +163,38 @@ CREATE TABLE IF NOT EXISTS login_codes (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_login_codes_email ON login_codes(email, created_at DESC);
+
+-- R2 가 켜지기 전까지 녹음 조각 파일을 DB에 저장 (조각 하나 20초 ≈ 100KB 이하)
+CREATE TABLE IF NOT EXISTS chunk_data (
+  recording_id  TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  seq           INTEGER NOT NULL,
+  mime          TEXT,
+  data          BLOB NOT NULL,
+  PRIMARY KEY (recording_id, seq)
+);
+
+-- 조각별 받아쓰기 상태
+CREATE TABLE IF NOT EXISTS chunk_text (
+  recording_id  TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  seq           INTEGER NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'failed', 'empty')),
+  text          TEXT,
+  language      TEXT,
+  model         TEXT,
+  error         TEXT,
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (recording_id, seq)
+);
+
+-- 가입 신청 (관리자가 승인하면 계정이 만들어진다)
+CREATE TABLE IF NOT EXISTS signup_requests (
+  id           TEXT PRIMARY KEY,
+  email        TEXT NOT NULL COLLATE NOCASE,
+  name         TEXT NOT NULL,
+  note         TEXT,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  decided_at   TEXT,
+  decided_by   TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_signup_status ON signup_requests(status, created_at DESC);
