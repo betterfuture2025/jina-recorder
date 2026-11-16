@@ -1,7 +1,7 @@
 // 서비스워커: 홈 화면 앱으로 설치되게 하고, 화면 파일을 미리 저장해 빨리 열리게 한다.
 // /api, /auth 요청은 저장하지 않는다. (녹음 조각은 화면 쪽에서 IndexedDB 에 따로 보관)
 // 인터넷이 없을 때도 앱 화면이 열려야 녹음을 할 수 있으므로 화면 파일은 꼭 보관한다.
-const VERSION = 'vn-shell-v13';
+const VERSION = 'vn-shell-v14';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/i18n.js', '/recorder.js', '/offline.js', '/manifest.webmanifest',
   '/icons/icon-192.png', '/icons/favicon-32.png', '/icons/apple-touch-icon.png',
   '/jina/portrait.png', '/jina/point.png', '/jina/think.png', '/jina/wave.png'];

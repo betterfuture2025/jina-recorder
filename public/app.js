@@ -62,7 +62,7 @@ function renderPendingBox() {
       ${!offline && syncStats.error !== 'login' ? '' : `<button type="button" class="btn btn-quiet btn-small" data-act="sync-now">${esc(t('syncNow'))}</button>`}
     </div>
     <ul class="pending-list">${list.map((r) => `<li>
-      <span>${esc(kindLabel(r.kind))} · ${esc(fmtStamp(r.startedAt))}${r.durationSec ? ' · ' + esc(fmtDur(r.durationSec)) : ''}${r.finished ? '' : ' · ' + esc(t('pendingNotFinished'))}</span>
+      <span>${esc(kindLabel(r.kind))} · ${esc(fmtStamp(r.startedAt))}${r.durationSec ? ' · ' + esc(fmtDur(r.durationSec)) : ''}${r.interrupted ? ' · ' + esc(t('pendingNotFinished')) : ''}</span>
       ${r.stuck ? `<span class="pending-err">${esc(r.error || t('pendingStuck'))}
         <button type="button" class="link-btn" data-retry="${esc(r.id)}">${esc(t('retry'))}</button>
         <button type="button" class="link-btn danger" data-drop="${esc(r.id)}">${esc(t('pendingDrop'))}</button></span>` : ''}
@@ -1224,7 +1224,8 @@ async function startRecording(kind, consent) {
       renderLines();
       // 먼저 휴대폰에 저장 → 올리기는 싱크가 알아서
       const p = saveChunk({ recId: id, seq: c.seq, blob: c.blob, type: c.type, startMs: c.startMs, endMs: c.endMs })
-        .then(() => { if (!navigator.onLine) patchRec(id, { offline: true }); syncer.kick(); })
+        .then(() => patchRec(id, navigator.onLine ? { lastEndMs: c.endMs } : { lastEndMs: c.endMs, offline: true }))
+        .then(() => syncer.kick())
         .catch(() => toast(t('saveFailed')));
       s.saves.push(p);
     },
@@ -2185,6 +2186,18 @@ window.addEventListener('hashchange', () => {
   else renderLogin();
 });
 
+// 녹음 도중 앱이 닫혔던 녹음: 저장된 데까지를 한 건으로 마무리해서 올린다
+async function recoverInterrupted() {
+  try {
+    for (const r of await listRecs()) {
+      if (!r.finished && (!session || session.id !== r.id)) {
+        await patchRec(r.id, { finished: true, durationSec: (r.lastEndMs || 0) / 1000, offline: true, interrupted: true });
+      }
+    }
+  } catch {}
+  syncer.kick();
+}
+
 const CACHE_KEY = 'vn_offline_cache';
 function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; } }
 function writeCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ user: state.user, config: state.config })); } catch {} }
@@ -2202,7 +2215,7 @@ async function boot() {
       writeCache();
       if (location.search) history.replaceState(null, '', '/' + location.hash);
       render();
-      syncer.kick();
+      recoverInterrupted();
     } catch (err) {
       if (err.status === 401) { try { localStorage.removeItem(CACHE_KEY); } catch {} renderLogin(); }
       else throw err;
@@ -2215,7 +2228,7 @@ async function boot() {
       state.config = { ...state.config, ...cached.config };
       state.offlineBoot = true;
       render();
-      syncer.report();
+      recoverInterrupted();
       return;
     }
     app.innerHTML = `<div class="login"><div class="login-body"><div class="notice error" role="alert">${esc(err.message)}</div>
