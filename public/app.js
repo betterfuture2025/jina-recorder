@@ -114,7 +114,7 @@ function renderLogin() {
         <p>${esc(t('loginBody'))}</p>
         ${errText && !errText.startsWith('err_') ? `<div class="notice error" role="alert">${errText}</div>` : ''}
         <a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>
-        <p class="login-foot">${esc(t('loginOnlyAllowed'))}</p>
+        <p class="login-foot">${esc(t('loginOnlyAllowed'))} <a href="/privacy.html">${esc(t('privacy'))}</a></p>
       </div>
     </div>`;
   bindLang(app, renderLogin);
