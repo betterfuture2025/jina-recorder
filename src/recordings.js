@@ -24,15 +24,28 @@ async function loadRecording(env, user, id) {
 }
 
 // ── 시작 ──
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function createRecording(env, request, user) {
   const body = await readJson(request);
   const kind = KINDS.includes(body.kind) ? body.kind : 'unassigned';
-  const id = uid();
+  // 휴대폰이 번호(id)를 미리 만들어 오면 그대로 쓴다 (인터넷 없이 녹음 → 나중에 올리기)
+  // 같은 번호로 두 번 와도 한 건만 생긴다.
+  let id = uid();
+  if (body.id && UUID_RE.test(body.id)) {
+    id = body.id.toLowerCase();
+    const had = await env.DB.prepare('SELECT id, owner_id, kind, started_at FROM recordings WHERE id = ?').bind(id).first();
+    if (had) {
+      if (had.owner_id !== user.id) throw new HttpError(409, 'id_taken', '이미 쓰인 녹음 번호예요.');
+      return json({ id, kind: had.kind, startedAt: had.started_at, existed: true });
+    }
+  }
   const consent = body.consent ? 1 : 0;
-  // 시작 시각은 휴대폰 기준(정확한 순간)을 받되, 엉뚱하면 서버 시각
+  // 시작 시각은 휴대폰 기준(정확한 순간)을 받는다. 인터넷 없이 녹음했다가 며칠 뒤 올릴 수도 있어서 30일까지 인정.
   let startedAt = new Date().toISOString();
-  if (body.startedAt && Math.abs(Date.parse(body.startedAt) - Date.now()) < 6 * 3600e3) {
-    startedAt = new Date(body.startedAt).toISOString();
+  const when = Date.parse(body.startedAt);
+  if (body.startedAt && when <= Date.now() + 10 * 60e3 && Date.now() - when < 30 * 86400e3) {
+    startedAt = new Date(when).toISOString();
   }
   const sqlTime = startedAt.replace('T', ' ').slice(0, 19);
   await env.DB.prepare(

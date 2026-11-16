@@ -1,11 +1,81 @@
 // 지나기록기 — 화면 (로그인, 처음 설치, 녹음, 기록, 관리, 내 정보)
 import { t, esc, getLang, setLang } from './i18n.js';
-import { ChunkRecorder, UploadQueue, supported as recSupported } from './recorder.js';
+import { ChunkRecorder, supported as recSupported } from './recorder.js';
+import { Syncer, putRec, patchRec, putChunk as saveChunk, deleteRec, listRecs, unstick, askPersist } from './offline.js';
 
 const app = document.getElementById('app');
 const state = { user: null, config: { appName: '지나기록기', googleReady: false }, redirectUri: '' };
 
 setLang(getLang());
+
+// ── 인터넷 없이 녹음 → 나중에 올리기 ───────────────────────
+const syncer = new Syncer({
+  autoSummary: () => state.config.autoSummary !== false,
+  onChunk: (recId, seq, data) => {
+    if (session && session.id === recId) {
+      const l = session.lines.get(seq);
+      session.lines.set(seq, { startMs: l ? l.startMs : 0, status: data.status, text: data.text });
+      session.renderLines && session.renderLines();
+    }
+  },
+  onSynced: (rec) => {
+    if (!session || session.id !== rec.id) toast(t('syncedOne', { when: fmtStamp(rec.startedAt) }));
+    const here = location.hash.replace(/^#/, '').split('?')[0] || '/';
+    if (state.user && !session && (here === '/' || here === '/records')) render();
+  },
+  onChange: (st) => {
+    syncStats = st;
+    renderNetBar();
+    renderPendingBox();
+    if (session && session.renderUpload) session.renderUpload(st);
+  },
+});
+let syncStats = { recs: 0, chunks: 0, online: navigator.onLine, list: [] };
+
+function renderNetBar() {
+  let bar = document.getElementById('net-bar');
+  const off = !navigator.onLine;
+  if (!off) { if (bar) bar.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'net-bar';
+    bar.setAttribute('role', 'status');
+    document.body.appendChild(bar);
+  }
+  bar.textContent = t('offlineBar');
+}
+window.addEventListener('online', renderNetBar);
+window.addEventListener('offline', renderNetBar);
+
+// 홈·게시판 위: 휴대폰에만 있는(아직 안 올라간) 녹음
+function renderPendingBox() {
+  const box = document.getElementById('pending-box');
+  if (!box) return;
+  const list = (syncStats.list || []).filter((r) => !session || r.id !== session.id);
+  if (!list.length) { box.innerHTML = ''; return; }
+  const stuck = list.filter((r) => r.stuck);
+  const offline = !navigator.onLine || syncStats.error === 'offline';
+  box.innerHTML = `<div class="pending-card">
+    <div class="pending-head">${ICONS.upload}<div>
+      <b>${esc(t('pendingTitle', { n: list.length }))}</b>
+      <small>${esc(syncStats.error === 'login' ? t('pendingLogin') : offline ? t('pendingOffline') : t('pendingUploading', { n: syncStats.chunks }))}</small></div>
+      ${!offline && syncStats.error !== 'login' ? '' : `<button type="button" class="btn btn-quiet btn-small" data-act="sync-now">${esc(t('syncNow'))}</button>`}
+    </div>
+    <ul class="pending-list">${list.map((r) => `<li>
+      <span>${esc(kindLabel(r.kind))} · ${esc(fmtStamp(r.startedAt))}${r.durationSec ? ' · ' + esc(fmtDur(r.durationSec)) : ''}${r.finished ? '' : ' · ' + esc(t('pendingNotFinished'))}</span>
+      ${r.stuck ? `<span class="pending-err">${esc(r.error || t('pendingStuck'))}
+        <button type="button" class="link-btn" data-retry="${esc(r.id)}">${esc(t('retry'))}</button>
+        <button type="button" class="link-btn danger" data-drop="${esc(r.id)}">${esc(t('pendingDrop'))}</button></span>` : ''}
+    </li>`).join('')}</ul>
+    ${stuck.length ? '' : ''}</div>`;
+  const now = box.querySelector('[data-act="sync-now"]');
+  if (now) now.addEventListener('click', () => { if (syncStats.error === 'login') location.reload(); else syncer.kick(); });
+  box.querySelectorAll('[data-retry]').forEach((b) => b.addEventListener('click', async () => { await unstick(b.dataset.retry); syncer.kick(); }));
+  box.querySelectorAll('[data-drop]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm(t('pendingDropConfirm'))) return;
+    await deleteRec(b.dataset.drop); syncer.report();
+  }));
+}
 
 // ── 서버 요청 ─────────────────────────────────────────────
 
@@ -159,6 +229,7 @@ const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><re
 const GOOGLE_G = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
 const ICONS = {
+  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1 0 8"/><path d="M12 12v8M9 15l3-3 3 3"/></svg>`,
   help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.7-.8 1.2v.4M12 16.8v.2"/></svg>`,
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`,
   eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -583,6 +654,7 @@ function pageRecord() {
       <span class="face">${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : `<img src="/jina/portrait.png" alt="">`}</span>
       <div><div class="greet-date">${esc(today)}</div><div class="greet-name">${t('hello', { name: first })}</div></div>
     </div>
+    <div id="pending-box"></div>
     <section class="rec-hero">
       <button class="rec-button" type="button" data-act="quick-record">
         ${ICONS.mic}<span class="rec-label">${esc(t('quickRecord'))}</span>
@@ -608,6 +680,7 @@ function pageRecord() {
       </div>
     </section>`);
   bindCommon();
+  renderPendingBox(); syncer.report();
   app.querySelector('[data-act="quick-record"]').addEventListener('click', () => beginRecording('unassigned'));
   app.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => beginRecording(b.dataset.kind)));
   loadRecent();
@@ -655,6 +728,7 @@ async function pageRecords() {
   const filters = [['', 'all'], ['consult', 'kindConsult'], ['meeting', 'kindMeeting'], ['memo', 'kindMemo'], ['unassigned', 'unassigned']];
   app.innerHTML = shell('records', `
     <h2 class="page-title">${esc(t('recordsTitle'))}</h2>
+    <div id="pending-box"></div>
     <form class="search" role="search" id="search">
       <label class="visually-hidden" for="q">${esc(t('searchPlaceholder'))}</label>
       ${ICONS.search}
@@ -668,6 +742,7 @@ async function pageRecords() {
     ${recordsContact ? `<p class="filter-note">${ICONS.people}<span>${esc(t('filterPerson', { name: recordsContact.name }))}</span><button type="button" class="link-btn" data-act="clear-contact">${esc(t('clearFilter'))}</button></p>` : ''}
     <div id="list"><p class="lead">${esc(t('loading'))}</p></div>`);
   bindCommon();
+  renderPendingBox(); syncer.report();
   app.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { recordsFilter = b.dataset.filter; pageRecords(); }));
   app.querySelector('#search').addEventListener('submit', (e) => { e.preventDefault(); recordsQuery = app.querySelector('#q').value.trim(); pageRecords(); });
   const cc = app.querySelector('[data-act="clear-contact"]');
@@ -1112,13 +1187,14 @@ let session = null; // 지금 녹음 중인 것
 
 async function startRecording(kind, consent) {
   const startedAt = new Date();
-  let id;
-  try {
-    ({ id } = await api('/api/recordings', { method: 'POST', body: { kind, consent, startedAt: startedAt.toISOString() } }));
-  } catch (err) { return handleError(err); }
+  // 녹음 번호는 휴대폰이 만든다 → 인터넷이 없어도 바로 시작
+  const id = crypto.randomUUID ? crypto.randomUUID() : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+  await putRec({ id, kind, consent: !!consent, startedAt: startedAt.toISOString(), created: false, finished: false, offline: !navigator.onLine });
+  askPersist();
+  syncer.kick();
 
   const lines = new Map(); // seq → { startMs, status, text }
-  const s = session = { id, kind, startedAt, lines, wakeLock: null, finished: false };
+  const s = session = { id, kind, startedAt, lines, wakeLock: null, finished: false, saves: [] };
 
   const renderLines = () => {
     const box = app.querySelector('#live-lines');
@@ -1126,41 +1202,31 @@ async function startRecording(kind, consent) {
     const arr = [...lines.entries()].sort((a, b) => a[0] - b[0]);
     box.innerHTML = arr.length ? arr.map(([, l]) => `
       <li><span class="line-time-static">${fmtClock(l.startMs)}</span>
-        <p class="${l.status === 'done' ? '' : 'muted'}">${l.status === 'done' ? esc(l.text) : esc(t(l.status === 'empty' ? 'chunkEmpty' : l.status === 'failed' ? 'chunkFailed' : 'chunkPending'))}</p></li>`).join('')
+        <p class="${l.status === 'done' ? '' : 'muted'}">${l.status === 'done' ? esc(l.text) : esc(t(l.status === 'empty' ? 'chunkEmpty' : l.status === 'failed' ? 'chunkFailed' : l.status === 'offline' ? 'chunkOffline' : 'chunkPending'))}</p></li>`).join('')
       : `<li class="live-hint">${esc(t('liveHint'))}</li>`;
     const card = app.querySelector('.live-card');
     if (card) card.scrollTop = card.scrollHeight;
   };
-  const renderQueue = (q) => {
+  s.renderLines = renderLines;
+  s.renderUpload = (st) => {
     const el = app.querySelector('#upload-state');
     if (!el) return;
-    const waiting = q.items.filter((i) => !i.done && i.tries > 0).length;
-    el.textContent = waiting ? t('uploadRetrying', { n: waiting }) : q.pending ? t('uploading', { n: q.pending }) : '';
+    const mine = (st.list || []).find((r) => r.id === id);
+    const offline = !navigator.onLine || st.error === 'offline';
+    el.classList.toggle('is-offline', offline);
+    el.textContent = offline ? t('offlineSaving') : (mine && st.chunks ? t('uploading', { n: st.chunks }) : '');
   };
-
-  const queue = s.queue = new UploadQueue({
-    upload: async (item) => {
-      const res = await fetch(`/api/recordings/${id}/chunks/${item.seq}`, {
-        method: 'PUT', credentials: 'same-origin',
-        headers: { 'x-requested-with': 'fetch', 'content-type': item.type, 'x-start-ms': String(item.startMs), 'x-end-ms': String(item.endMs) },
-        body: item.blob,
-      });
-      if (res.status === 401) { throw Object.assign(new Error('login'), { status: 401 }); }
-      if (!res.ok) throw new Error('upload ' + res.status);
-      const data = await res.json();
-      lines.set(item.seq, { startMs: item.startMs, status: data.status, text: data.text });
-      renderLines();
-      return data;
-    },
-    onUpdate: renderQueue,
-  });
 
   const rec = s.rec = new ChunkRecorder({
     chunkMs: 20000,
     onChunk: (c) => {
-      lines.set(c.seq, { startMs: c.startMs, status: 'pending', text: '' });
+      lines.set(c.seq, { startMs: c.startMs, status: navigator.onLine ? 'pending' : 'offline', text: '' });
       renderLines();
-      queue.add(c);
+      // 먼저 휴대폰에 저장 → 올리기는 싱크가 알아서
+      const p = saveChunk({ recId: id, seq: c.seq, blob: c.blob, type: c.type, startMs: c.startMs, endMs: c.endMs })
+        .then(() => { if (!navigator.onLine) patchRec(id, { offline: true }); syncer.kick(); })
+        .catch(() => toast(t('saveFailed')));
+      s.saves.push(p);
     },
     onLevel: (level) => {
       const bars = app.querySelectorAll('.meter i');
@@ -1205,9 +1271,11 @@ async function startRecording(kind, consent) {
 
   try {
     await rec.start();
+    s.renderUpload(syncStats);
   } catch (err) {
     session = null;
-    await api(`/api/recordings/${id}`, { method: 'DELETE' }).catch(() => {});
+    await deleteRec(id).catch(() => {});
+    api(`/api/recordings/${id}`, { method: 'DELETE' }).catch(() => {});
     toast(err && err.name === 'NotAllowedError' ? t('micDenied') : t('micError'));
     return render();
   }
@@ -1236,16 +1304,26 @@ async function finishRecording(btn) {
   btn.querySelector('span').textContent = t('finishing');
   await s.rec.stop();
   clearInterval(s.clockTimer);
-  const allUp = await s.queue.drain(90000);
+  await Promise.allSettled(s.saves);
+  const durationSec = s.rec.elapsedMs() / 1000;
+  await patchRec(s.id, { finished: true, durationSec });
   s.finished = true;
-  try { await api(`/api/recordings/${s.id}/finish`, { method: 'POST', body: { durationSec: s.rec.elapsedMs() / 1000 } }); } catch {}
   try { s.wakeLock && s.wakeLock.release(); } catch {}
   document.removeEventListener('visibilitychange', s.onVis);
   window.removeEventListener('beforeunload', s.onUnload);
+  // 인터넷이 되면 다 올라갈 때까지 잠깐 기다렸다가 기록으로, 안 되면 휴대폰에 두고 홈으로
+  syncer.kick();
+  const uploaded = navigator.onLine ? await syncer.waitFor(s.id, 90000) : false;
   session = null;
-  if (!allUp) toast(t('someNotUploaded'));
-  location.hash = `#/r/${s.id}`;
+  if (uploaded) {
+    location.hash = `#/r/${s.id}`;
+  } else {
+    await patchRec(s.id, { offline: true });
+    toast(t('savedOnPhone'));
+    location.hash = '#/';
+  }
   render();
+  syncer.report();
 }
 
 
@@ -2107,7 +2185,12 @@ window.addEventListener('hashchange', () => {
   else renderLogin();
 });
 
+const CACHE_KEY = 'vn_offline_cache';
+function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; } }
+function writeCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ user: state.user, config: state.config })); } catch {} }
+
 async function boot() {
+  renderNetBar();
   try {
     state.config = await api('/api/config');
     const status = await api('/api/setup/status');
@@ -2116,13 +2199,25 @@ async function boot() {
     try {
       const { user } = await api('/api/me');
       state.user = user;
+      writeCache();
       if (location.search) history.replaceState(null, '', '/' + location.hash);
       render();
+      syncer.kick();
     } catch (err) {
-      if (err.status === 401) renderLogin();
+      if (err.status === 401) { try { localStorage.removeItem(CACHE_KEY); } catch {} renderLogin(); }
       else throw err;
     }
   } catch (err) {
+    // 인터넷이 없을 때: 지난번 로그인 정보로 열어서 녹음은 할 수 있게
+    const cached = readCache();
+    if (err.code === 'network' && cached && cached.user) {
+      state.user = cached.user;
+      state.config = { ...state.config, ...cached.config };
+      state.offlineBoot = true;
+      render();
+      syncer.report();
+      return;
+    }
     app.innerHTML = `<div class="login"><div class="login-body"><div class="notice error" role="alert">${esc(err.message)}</div>
       <button class="btn btn-quiet" id="retry">${esc(t('retry'))}</button></div></div>`;
     document.getElementById('retry').addEventListener('click', () => location.reload());
