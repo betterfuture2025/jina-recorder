@@ -110,8 +110,11 @@ export async function finishGoogleLogin(env, request) {
   const url = new URL(request.url);
   const clearState = cookie(STATE_COOKIE, '', { maxAge: 0, path: '/auth', secure: isSecureRequest(request) });
 
-  if (url.searchParams.get('error')) {
-    return redirect(back(request, { error: 'google_cancelled' }), [clearState]);
+  const gErr = url.searchParams.get('error');
+  if (gErr) {
+    // access_denied 는 사용자가 취소한 것, 나머지는 구글 쪽 설정 문제라 코드를 그대로 보여 준다.
+    if (gErr === 'access_denied') return redirect(back(request, { error: 'google_cancelled' }), [clearState]);
+    return redirect(back(request, { error: 'google_error', code: gErr.slice(0, 60) }), [clearState]);
   }
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');

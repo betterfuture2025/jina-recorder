@@ -99,7 +99,7 @@ function renderLogin() {
   const params = new URLSearchParams(location.search);
   const err = params.get('error');
   const email = params.get('email') || '';
-  const errText = err ? t('err_' + err, { email }) : '';
+  const errText = err ? t('err_' + err, { email, code: params.get('code') || '' }) : '';
   const heights = [30, 55, 80, 45, 95, 60, 35, 75, 50, 85, 40, 25, 18, 22, 14, 20, 12];
 
   app.innerHTML = `
