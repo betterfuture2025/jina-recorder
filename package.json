@@ -1,0 +1,29 @@
+{
+  "name": "jina-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "지나기록기 — 상담·회의 녹음 기록 — 파트 1: 뼈대와 로그인",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "setup": "node scripts/setup.mjs",
+    "dev": "wrangler dev",
+    "db:local": "wrangler d1 execute DB --local --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.162.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "기록·선생님 계정·설정이 저장되는 DB예요. 이름은 그대로 두세요."
+      },
+      "ENC_KEY": {
+        "description": "설정에 넣는 API 키를 잠그는 **열쇠**예요. 16자 이상 아무 문장을 넣고, 따로 적어 두세요. **나중에 바꾸면 저장한 키를 다시 넣어야 해요.**"
+      },
+      "SETUP_KEY": {
+        "description": "사이트를 처음 열면 나오는 **처음 설치** 화면에서 넣을 비밀번호예요. 직접 정해서 넣으세요."
+      }
+    }
+  }
+}
