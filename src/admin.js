@@ -1,6 +1,6 @@
 // 처음 설치, 사용자(선생님) 관리, 설정 저장
 import { json, uid, readJson, normEmail, EMAIL_RE, HttpError, safeEqual } from './util.js';
-import { hasEncKey } from './crypto.js';
+import { hasEncKey, isPlaceholder } from './crypto.js';
 import { saveSettings, listForAdmin, getSetting } from './settings.js';
 import { redirectUri, createSession, testGoogleCredentials } from './auth.js';
 
@@ -15,15 +15,17 @@ export async function setupStatus(env, request) {
   return json({
     needsSetup: (await adminCount(env)) === 0,
     encKeyOk: hasEncKey(env),
-    setupKeyOk: !!env.SETUP_KEY,
+    setupKeyOk: !!env.SETUP_KEY && !isPlaceholder(env.SETUP_KEY),
     redirectUri: redirectUri(request),
   });
 }
 
 export async function runSetup(env, request) {
   if ((await adminCount(env)) > 0) throw new HttpError(409, 'already_setup', '이미 설치가 끝났어요.');
-  if (!hasEncKey(env)) throw new HttpError(500, 'enc_key_missing', 'ENC_KEY 비밀값이 등록되지 않았어요.');
-  if (!env.SETUP_KEY) throw new HttpError(500, 'setup_key_missing', 'SETUP_KEY 비밀값이 등록되지 않았어요.');
+  if (!hasEncKey(env)) throw new HttpError(500, 'enc_key_missing', 'ENC_KEY 비밀값이 없거나 안내 문장 그대로예요. Cloudflare → Workers → jina-recorder → 설정 → 변수와 비밀에서 16자 이상 문장으로 바꿔 주세요.');
+  if (!env.SETUP_KEY || isPlaceholder(env.SETUP_KEY)) {
+    throw new HttpError(500, 'setup_key_missing', 'SETUP_KEY 비밀값이 안내 문장 그대로예요. Cloudflare → Workers → jina-recorder → 설정 → 변수와 비밀에서 바꿔 주세요.');
+  }
 
   const body = await readJson(request);
   if (!(await safeEqual(body.setupKey || '', env.SETUP_KEY))) {

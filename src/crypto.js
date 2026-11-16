@@ -26,8 +26,14 @@ function asRawKey(value) {
   return null;
 }
 
+// .dev.vars.example 의 안내 문장을 그대로 넣은 경우는 공개된 값이라 쓰지 않는다.
+export function isPlaceholder(v) {
+  return /16자 이상|처음 설치 화면에서|바꾸지 마세요|example|change.?me/i.test(String(v || ''));
+}
+
 export function hasEncKey(env) {
   const v = (env.ENC_KEY || '').trim();
+  if (isPlaceholder(v)) return false;
   return !!asRawKey(v) || v.length >= 16;
 }
 

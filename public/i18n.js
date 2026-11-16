@@ -44,7 +44,7 @@ export const STRINGS = {
     clientSecret: '클라이언트 보안 비밀번호',
     setupSubmit: '설치 마치기',
     setupDone: '설치를 마쳤어요. 관리자 지메일로 로그인하세요.',
-    setupMissingSecrets: '서버 비밀값(ENC_KEY, SETUP_KEY)이 아직 없어요. 설치 스크립트를 끝까지 실행했는지 확인해 주세요.',
+    setupMissingSecrets: '서버 비밀값(ENC_KEY, SETUP_KEY)이 없거나 안내 문장 그대로예요. Cloudflare → Workers → jina-recorder → 설정 → 변수와 비밀에서 직접 정한 값으로 바꿔 주세요.',
 
     // 탭
     tabRecord: '녹음',
@@ -178,7 +178,7 @@ export const STRINGS = {
     clientSecret: 'Client secret',
     setupSubmit: 'Finish setup',
     setupDone: 'Setup is done. Sign in with the admin Gmail.',
-    setupMissingSecrets: 'Server secrets (ENC_KEY, SETUP_KEY) are missing. Check that the setup script ran to the end.',
+    setupMissingSecrets: 'Server secrets (ENC_KEY, SETUP_KEY) are missing or still the example text. Change them in Cloudflare → Workers → jina-recorder → Settings → Variables and Secrets.',
 
     tabRecord: 'Record',
     tabRecords: 'Notes',
