@@ -162,6 +162,7 @@ const ICONS = {
   help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.7-.8 1.2v.4M12 16.8v.2"/></svg>`,
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`,
   eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
@@ -262,10 +263,6 @@ function bindPasswordLogin() {
     const em = app.querySelector(loginMode === 'code' ? '#pw-login [name=email]' : '#email-start [name=email]');
     if (em && em.value) loginEmail = em.value.trim().toLowerCase();
     renderLogin();
-  }));
-  app.querySelectorAll('[data-act="eye"]').forEach((b) => b.addEventListener('click', () => {
-    const input = b.parentElement.querySelector('input');
-    input.type = input.type === 'password' ? 'text' : 'password';
   }));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1298,6 +1295,35 @@ function pageMe() {
 }
 
 // ── 공통 ─────────────────────────────────────────────────
+
+// 모든 비밀번호 칸에 눈 모양 버튼 (보기 / 숨기기)
+function addEyes(root = document) {
+  root.querySelectorAll('input[type="password"]').forEach((input) => {
+    if (input.closest('.pw-wrap')) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'pw-wrap';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pw-eye';
+    b.setAttribute('aria-label', t('showPassword'));
+    b.innerHTML = ICONS.eye;
+    wrap.appendChild(b);
+  });
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.pw-eye');
+  if (!b) return;
+  e.preventDefault();
+  const input = b.parentElement.querySelector('input');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  b.innerHTML = show ? ICONS.eyeOff : ICONS.eye;
+  b.setAttribute('aria-label', t(show ? 'hidePassword' : 'showPassword'));
+  b.setAttribute('aria-pressed', String(show));
+});
+new MutationObserver(() => addEyes()).observe(document.body, { childList: true, subtree: true });
+addEyes();
 
 function bindCommon() {
   bindLang(app, render);

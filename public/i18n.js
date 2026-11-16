@@ -163,7 +163,7 @@ export const STRINGS = {
     genericError: '문제가 생겼어요. 다시 해 주세요.',
     // 비밀번호 로그인
     password: '비밀번호',
-    showPassword: '비밀번호 보기',
+    showPassword: '비밀번호 보기', hidePassword: '비밀번호 숨기기',
     loginButton: '로그인',
     useCodeInstead: '비밀번호 대신 이메일 인증번호로 로그인',
     usePasswordInstead: '비밀번호로 로그인',
@@ -439,7 +439,7 @@ export const STRINGS = {
     networkError: 'Check your internet connection.',
     genericError: 'Something went wrong. Try again.',
     password: 'Password',
-    showPassword: 'Show password',
+    showPassword: 'Show password', hidePassword: 'Hide password',
     loginButton: 'Sign in',
     useCodeInstead: 'Sign in with an email code instead',
     usePasswordInstead: 'Sign in with a password',
