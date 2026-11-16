@@ -8,6 +8,9 @@ const PROFILE = ['last_name', 'first_name', 'first_name_en', 'last_name_en', 'po
 const COLUMNS = [
   ...PROFILE.map((c) => ['users', c, 'TEXT']),
   ...PROFILE.map((c) => ['signup_requests', c, 'TEXT']),
+  ['users', 'password_hash', 'TEXT'],
+  ['users', 'password_set_at', 'TEXT'],
+  ['signup_requests', 'password_hash', 'TEXT'],
 ];
 
 let ready = null;

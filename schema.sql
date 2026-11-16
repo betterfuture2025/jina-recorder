@@ -198,3 +198,10 @@ CREATE TABLE IF NOT EXISTS signup_requests (
   decided_by   TEXT REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_signup_status ON signup_requests(status, created_at DESC);
+
+-- 비밀번호 로그인 실패 기록 (15분에 8번 틀리면 잠깐 잠금)
+CREATE TABLE IF NOT EXISTS login_failures (
+  email       TEXT NOT NULL COLLATE NOCASE,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_login_failures ON login_failures(email, created_at);

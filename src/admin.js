@@ -4,6 +4,7 @@ import { hasEncKey, isPlaceholder } from './crypto.js';
 import { saveSettings, listForAdmin, getSetting } from './settings.js';
 import { mailReady } from './mail.js';
 import { PROFILE_FIELDS, pickProfile, displayName } from './profile.js';
+import { checkPasswordRule, hashPassword } from './password.js';
 import { redirectUri, createSession, testGoogleCredentials } from './auth.js';
 
 // ── 처음 설치 ───────────────────────────────────────────
@@ -56,7 +57,7 @@ export async function runSetup(env, request) {
 
 // ── 사용자 관리 ─────────────────────────────────────────
 
-const USER_COLS = 'id, email, name, role, active, picture, created_at, last_login_at, ' + PROFILE_FIELDS.join(', ');
+const USER_COLS = 'id, email, name, role, active, picture, created_at, last_login_at, (password_hash IS NOT NULL) AS has_password, ' + PROFILE_FIELDS.join(', ');
 
 export async function listUsers(env) {
   const { results } = await env.DB.prepare(
@@ -75,14 +76,15 @@ export async function addUser(env, request) {
   const exists = await env.DB.prepare('SELECT id, active FROM users WHERE email = ?').bind(email).first();
   if (exists && exists.active) throw new HttpError(409, 'exists', '이미 등록된 이메일이에요.');
   const vals = PROFILE_FIELDS.map((f) => prof[f] ?? null);
+  const pwHash = body.password ? await hashPassword(checkPasswordRule(body.password)) : null;
   if (exists) {
     await env.DB.prepare(
-      `UPDATE users SET active = 1, role = ?, name = COALESCE(?, name), ${PROFILE_FIELDS.map((f) => `${f} = COALESCE(?, ${f})`).join(', ')} WHERE id = ?`
-    ).bind(role, name, ...vals, exists.id).run();
+      `UPDATE users SET active = 1, role = ?, name = COALESCE(?, name), password_hash = COALESCE(?, password_hash), ${PROFILE_FIELDS.map((f) => `${f} = COALESCE(?, ${f})`).join(', ')} WHERE id = ?`
+    ).bind(role, name, pwHash, ...vals, exists.id).run();
   } else {
     await env.DB.prepare(
-      `INSERT INTO users (id, email, name, role, ${PROFILE_FIELDS.join(', ')}) VALUES (?, ?, ?, ?, ${PROFILE_FIELDS.map(() => '?').join(', ')})`
-    ).bind(uid(), email, name, role, ...vals).run();
+      `INSERT INTO users (id, email, name, role, password_hash, ${PROFILE_FIELDS.join(', ')}) VALUES (?, ?, ?, ?, ?, ${PROFILE_FIELDS.map(() => '?').join(', ')})`
+    ).bind(uid(), email, name, role, pwHash, ...vals).run();
   }
   const user = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE email = ?`).bind(email).first();
   return json({ user }, 201);

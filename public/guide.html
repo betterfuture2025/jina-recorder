@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>지나기록기 사용법</title>
+<meta name="description" content="지나기록기를 처음 쓰는 분을 위한 그림 사용법">
+<meta property="og:title" content="지나기록기 사용법">
+<meta property="og:image" content="/og-image.png">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:#EFF3EE;--surface:#fff;--ink:#1F2328;--muted:#5A6370;--line:#D8E0D9;--line-strong:#C3CDC5;
+  --sage:#CFE0D3;--green:#3F6E52;--green-soft:#DCE8DE;--red:#D93A3F;--red-soft:#F6D9DA;--mustard:#F6E3B4;--mustard-ink:#7A5300;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#14181B;--surface:#1C2226;--ink:#E8EDE9;--muted:#9AA59E;--line:#2A3236;--line-strong:#3A454A;
+  --sage:#2A3F31;--green:#7FB894;--green-soft:#22352A;--red:#FF5A5F;--red-soft:#3A1C1E;--mustard:#3A2E12;--mustard-ink:#F0C66B;}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans KR',-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere;-webkit-text-size-adjust:100%}
+a{color:var(--green)}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 80px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0 8px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--ink);text-decoration:none}
+.lang{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line-strong);background:transparent;color:var(--ink);border-radius:999px;min-height:36px;padding:0 14px;cursor:pointer}
+.hero{display:flex;align-items:flex-end;gap:12px;margin:8px 0 18px}
+.hero h1{font-size:clamp(26px,7vw,34px);line-height:1.25;letter-spacing:-.02em;margin:0 0 6px}
+.hero p{margin:0;color:var(--muted)}
+.hero img{height:150px;width:auto;flex:none}
+.hero > div{flex:1;padding-bottom:12px}
+
+/* 차례 */
+.toc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 28px;padding:0;list-style:none}
+.toc a{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;text-decoration:none;color:var(--ink);font-weight:600;min-height:56px}
+.toc .ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:16px;font-weight:700}
+.toc .who{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+@media (max-width:420px){.toc{grid-template-columns:1fr}}
+
+section.chapter{margin:0 0 40px;scroll-margin-top:12px}
+.chap-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.chap-num{width:40px;height:40px;border-radius:12px;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-weight:700;font-size:18px;flex:none}
+.chap-head h2{margin:0;font-size:22px;letter-spacing:-.01em}
+.chap-lead{color:var(--muted);margin:0 0 14px}
+.badge-admin{display:inline-block;font-size:12px;font-weight:700;color:var(--mustard-ink);background:var(--mustard);border-radius:999px;padding:2px 10px;margin-left:6px;vertical-align:3px}
+
+/* 단계: 왼쪽 번호 선, 오른쪽 설명 + 그림 */
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps > li{counter-increment:s;position:relative;padding:0 0 18px 48px}
+ol.steps > li::before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;font-weight:700;display:grid;place-items:center}
+ol.steps > li:not(:last-child)::after{content:'';position:absolute;left:16px;top:38px;bottom:4px;width:2px;background:var(--line-strong)}
+.step-title{font-weight:700;font-size:17px;margin:4px 0 2px}
+.step-body{margin:0 0 10px;color:var(--ink)}
+.step-body small{color:var(--muted)}
+.card{background:var(--surface);border-radius:18px;padding:14px;border:1px solid var(--line)}
+.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:480px){.split{grid-template-columns:1fr}}
+.split h4{margin:0 0 6px;font-size:15px}
+.split ol{margin:0;padding-left:20px}
+
+/* 작은 휴대폰 그림 */
+.phone{width:168px;height:300px;border-radius:26px;border:3px solid var(--ink);background:var(--paper);position:relative;overflow:hidden;margin:4px 0 4px;flex:none}
+.phone::before{content:'';position:absolute;top:6px;left:50%;transform:translateX(-50%);width:44px;height:6px;border-radius:4px;background:var(--ink);opacity:.8}
+.ph-bar{position:absolute;left:10px;right:10px;top:20px;display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700}
+.ph-burger{width:14px;height:10px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
+.ph-burger::after{content:'';position:absolute;left:0;right:0;top:2px;border-top:2px solid var(--ink)}
+.ph-rec{position:absolute;left:50%;top:70px;transform:translateX(-50%);width:84px;height:84px;border-radius:50%;background:var(--red);box-shadow:0 0 0 6px var(--red-soft);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.ph-kinds{position:absolute;left:10px;right:10px;top:178px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.ph-kinds span{height:26px;border-radius:6px;background:var(--surface);border:1px solid var(--line-strong);font-size:9px;font-weight:700;display:grid;place-items:center}
+.ph-tabs{position:absolute;left:0;right:0;bottom:0;height:30px;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);font-size:8px;font-weight:700;align-items:center;text-align:center;color:var(--muted)}
+.hot{outline:3px solid var(--mustard-ink);outline-offset:3px;border-radius:inherit;animation:hot 1.6s ease-in-out infinite}
+@keyframes hot{50%{outline-color:transparent}}
+.tap{position:absolute;width:34px;height:34px;pointer-events:none}
+.ph-dark{background:#1F2328;color:#F2F4F2}
+.ph-dark .ph-clock{position:absolute;left:0;right:0;top:44px;text-align:center;font-size:26px;font-weight:700}
+.ph-dark .ph-date{position:absolute;left:0;right:0;top:30px;text-align:center;font-size:8px;color:#C9D1CC}
+.ph-dark .ph-text{position:absolute;left:10px;right:10px;top:96px;bottom:62px;background:#F2F4F2;border-radius:10px;color:#1F2328;font-size:8px;padding:8px;line-height:1.5}
+.ph-dark .ph-text i{display:block;height:5px;border-radius:3px;background:#C3CDC5;margin:4px 0}
+.ph-stop{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);height:34px;padding:0 14px;border-radius:999px;background:#D93A3F;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;white-space:nowrap}
+.ph-sheet{position:absolute;left:0;right:0;bottom:0;height:150px;background:var(--surface);border-radius:16px 16px 0 0;padding:12px;font-size:10px;box-shadow:0 -1px 0 var(--line)}
+.ph-sheet b{display:block;font-size:11px;margin-bottom:6px}
+.ph-check{display:flex;align-items:center;gap:6px;margin:8px 0}
+.ph-check span{width:14px;height:14px;border-radius:4px;background:var(--green);display:grid;place-items:center;color:#fff;font-size:10px}
+.ph-btn{height:26px;border-radius:8px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:700;margin-top:8px}
+.ph-list{position:absolute;left:10px;right:10px;top:42px;display:flex;flex-direction:column;gap:6px}
+.ph-list .d{font-size:8px;font-weight:700;color:var(--muted)}
+.ph-list .c{background:var(--surface);border-radius:8px;padding:6px;font-size:8px}
+.ph-list .c b{display:block;font-size:9px}
+.ph-search{height:22px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);font-size:8px;color:var(--muted);display:flex;align-items:center;padding:0 6px}
+.figure-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.figure-row .card{flex:1;min-width:220px}
+
+/* 로그인 3가지 */
+.ways{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.ways{grid-template-columns:1fr}}
+.way{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+.way h4{margin:0 0 4px;font-size:16px}
+.way p{margin:0;font-size:14px;color:var(--muted)}
+.way .tag{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--green-soft);color:var(--green);margin-bottom:6px}
+
+/* 흐름도 */
+.flow{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.flow .node{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:14px}
+.flow .node > b{display:block;font-size:15px}
+.flow .arrow{align-self:center;color:var(--muted);font-size:20px;font-weight:700}
+@media (max-width:560px){.flow{flex-direction:column}.flow .arrow{transform:rotate(90deg);align-self:center}}
+
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 14px;margin-bottom:8px}
+.faq summary{cursor:pointer;font-weight:700;min-height:52px;display:flex;align-items:center;list-style:none}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';margin-left:auto;font-size:20px;color:var(--muted)}
+.faq details[open] summary::after{content:'–'}
+.faq details p{margin:0 0 14px}
+.back{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-weight:700;text-decoration:none;background:var(--green);color:#fff;border-radius:14px;min-height:52px;padding:0 20px}
+kbd{font-family:inherit;font-weight:700;background:var(--surface);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:6px;padding:0 6px;font-size:.92em}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="9" fill="#1F2328"/><circle cx="15" cy="15" r="6" fill="#D93A3F"/></svg>
+      <span data-en="Jina Recorder">지나기록기</span>
+    </a>
+    <button class="lang" type="button" id="lang">EN</button>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1 data-en="How to use Jina Recorder">지나기록기<br>사용법</h1>
+      <p data-en="Follow the pictures one step at a time. It takes 5 minutes.">그림을 보면서 하나씩 따라 하면 돼요. 5분이면 충분해요.</p>
+    </div>
+    <img src="/jina/present.png" alt="" aria-hidden="true">
+  </div>
+
+  <ul class="toc">
+    <li><a href="#install"><span class="ico" style="background:var(--green-soft);color:var(--green)">1</span><span><span data-en="Add to home screen">홈 화면에 추가</span><span class="who" data-en="Everyone · once">모두 · 처음 한 번</span></span></a></li>
+    <li><a href="#login"><span class="ico" style="background:var(--green-soft);color:var(--green)">2</span><span><span data-en="Sign in">로그인하기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
+    <li><a href="#record"><span class="ico" style="background:var(--red-soft);color:var(--red)">3</span><span><span data-en="Record">녹음하기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
+    <li><a href="#board"><span class="ico" style="background:var(--green-soft);color:var(--green)">4</span><span><span data-en="Find notes">게시판에서 찾기</span><span class="who" data-en="Everyone">모두</span></span></a></li>
+    <li><a href="#admin"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">5</span><span><span data-en="Manage teachers">선생님 관리</span><span class="who" data-en="Admins">관리자</span></span></a></li>
+    <li><a href="#mail"><span class="ico" style="background:var(--mustard);color:var(--mustard-ink)">6</span><span><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="who" data-en="Admins · once">관리자 · 처음 한 번</span></span></a></li>
+  </ul>
+
+  <!-- 1. 홈 화면에 추가 -->
+  <section class="chapter" id="install">
+    <div class="chap-head"><span class="chap-num">1</span><h2 data-en="Add it to your home screen">홈 화면에 추가하기</h2></div>
+    <p class="chap-lead" data-en="Do this once, and it opens like an app. You stay signed in for about 6 months.">한 번만 하면 앱처럼 바로 열리고, 로그인도 약 6개월 유지돼요.</p>
+    <div class="split">
+      <div class="card">
+        <h4 data-en="iPhone (Safari)">아이폰 (사파리)</h4>
+        <ol>
+          <li data-en="Open the site in Safari">사파리에서 사이트 열기</li>
+          <li data-en="Tap the Share button at the bottom (square with an arrow up)">아래쪽 <b>공유</b> 버튼 누르기 (네모에 위 화살표)</li>
+          <li data-en="Scroll and tap “Add to Home Screen”"><b>홈 화면에 추가</b> 누르기</li>
+          <li data-en="Tap “Add” at the top right">오른쪽 위 <b>추가</b> 누르기</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h4 data-en="Android (Chrome)">안드로이드 (크롬)</h4>
+        <ol>
+          <li data-en="Open the site in Chrome">크롬에서 사이트 열기</li>
+          <li data-en="Tap ⋮ at the top right">오른쪽 위 <b>⋮</b> 누르기</li>
+          <li data-en="Tap “Install app” or “Add to home screen”"><b>앱 설치</b> 또는 <b>홈 화면에 추가</b> 누르기</li>
+          <li data-en="Tap “Install”"><b>설치</b> 누르기</li>
+        </ol>
+      </div>
+    </div>
+    <p style="margin:10px 0 0" data-en="When you see Jina’s face on your home screen, you’re done.">홈 화면에 <b>지나 얼굴 아이콘</b>이 생기면 끝이에요.</p>
+  </section>
+
+  <!-- 2. 로그인 -->
+  <section class="chapter" id="login">
+    <div class="chap-head"><span class="chap-num">2</span><h2 data-en="Sign in">로그인하기</h2></div>
+    <p class="chap-lead" data-en="Pick whichever is easiest. All three get you to the same place.">셋 중 편한 걸로 하세요. 어떤 방법이든 같은 곳으로 들어가요.</p>
+    <div class="ways">
+      <div class="way"><span class="tag" data-en="Easiest">가장 쉬워요</span><h4 data-en="Email + password">이메일 + 비밀번호</h4><p data-en="Enter the email and password you set when you signed up.">가입할 때 정한 이메일과 비밀번호를 넣어요.</p></div>
+      <div class="way"><span class="tag" data-en="No password">비밀번호 없이</span><h4 data-en="Email code">이메일 인증번호</h4><p data-en="Tap “Sign in with an email code”, get 6 digits by email, type them in.">"인증번호로 로그인"을 누르면 메일로 6자리가 와요. 그걸 넣어요.</p></div>
+      <div class="way"><span class="tag" data-en="Google accounts">구글 계정이면</span><h4 data-en="Sign in with Google">구글로 로그인</h4><p data-en="Tap the Google button and choose your account.">구글 버튼을 누르고 내 계정을 골라요.</p></div>
+    </div>
+
+    <h3 style="margin:22px 0 8px;font-size:17px" data-en="No account yet? Request access">계정이 없으면? 가입 신청</h3>
+    <div class="flow" aria-label="가입 신청 흐름">
+      <div class="node"><b data-en="① Request">① 신청</b><span data-en="Login screen → “Request access” → fill in your details">로그인 화면 → <b>가입 신청하기</b> → 정보 넣기</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node"><b data-en="② Approval">② 승인</b><span data-en="An admin taps “Approve”">관리자가 <b>승인</b>을 눌러요</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node"><b data-en="③ Sign in">③ 로그인</b><span data-en="Sign in with the same email">같은 이메일로 로그인</span></div>
+    </div>
+  </section>
+
+  <!-- 3. 녹음하기 -->
+  <section class="chapter" id="record">
+    <div class="chap-head"><span class="chap-num" style="background:var(--red)">3</span><h2 data-en="Record">녹음하기</h2></div>
+    <p class="chap-lead" data-en="Put the phone on the table between you and talk as usual.">휴대폰을 탁자 가운데 놓고 평소처럼 이야기하면 돼요.</p>
+    <ol class="steps">
+      <li>
+        <div class="step-title" data-en="Press the big red button">큰 빨간 버튼 누르기</div>
+        <p class="step-body" data-en="“Record now” starts straight away. Or choose Memo, Meeting or Consultation first.">"바로 녹음"은 누르자마자 시작해요. 먼저 정하고 싶으면 아래 <b>혼자 메모 · 회의 · 상담</b> 중에 고르세요.</p>
+        <div class="figure-row">
+          <div class="phone" aria-hidden="true">
+            <div class="ph-bar"><span class="ph-burger"></span><span>지나기록기</span></div>
+            <div class="ph-rec hot">바로 녹음</div>
+            <div class="ph-kinds"><span>메모</span><span>회의</span><span class="hot">상담</span></div>
+            <div class="ph-tabs"><span>게시판</span><span style="color:var(--ink)">녹음</span><span>관리</span><span>내 정보</span></div>
+          </div>
+          <div class="card"><b data-en="Not sure who it’s with?">누구와 할지 아직 모르겠다면?</b><p style="margin:4px 0 0" data-en="Just press “Record now”. You can set the type and title afterwards.">그냥 <b>바로 녹음</b>을 누르세요. 종류와 제목은 끝난 뒤에 정해도 돼요.</p></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-title" data-en="For consultations, tick consent">상담이면 동의 체크</div>
+        <p class="step-body" data-en="Tell the parent you are recording, tick the box, then “Start recording”.">학부모님께 녹음한다고 말씀드리고 체크한 다음 <b>녹음 시작</b>을 눌러요.</p>
+        <div class="phone" aria-hidden="true">
+          <div class="ph-sheet"><b>녹음 동의를 받으셨나요?</b><div class="ph-check"><span>✓</span>상대방에게 동의를 받았어요</div><div class="ph-btn hot">녹음 시작</div></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-title" data-en="Talk. The words appear every 20 seconds">이야기하기, 20초마다 글자가 떠요</div>
+        <p class="step-body" data-en="Keep the screen on. The date and start time are shown at the top. If the internet drops, it retries by itself.">화면은 켜 두세요. 위쪽에 날짜와 시작 시간이 보여요. 인터넷이 잠깐 끊겨도 저절로 다시 올려요.<br><small data-en="Pause with ‖ if you need a break.">잠깐 쉬려면 ‖ 버튼으로 멈췄다가 다시 누르면 이어져요.</small></p>
+        <div class="phone ph-dark" aria-hidden="true">
+          <div class="ph-date">2026.11.16 (월) 오후 3:10 시작</div>
+          <div class="ph-clock">12:48</div>
+          <div class="ph-text">실시간 받아쓰기<i></i><i style="width:80%"></i><i></i><i style="width:60%"></i></div>
+          <div class="ph-stop hot">■ 끝내고 저장하기</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-title" data-en="Press “Stop and save”">"끝내고 저장하기" 누르기</div>
+        <p class="step-body" data-en="Wait a moment while the last part uploads. The record opens by itself.">마지막 조각이 올라가는 동안 잠깐 기다리면 기록 화면이 저절로 열려요.</p>
+      </li>
+      <li>
+        <div class="step-title" data-en="Give it a title (optional)">제목 붙이기 (선택)</div>
+        <p class="step-body" data-en="e.g. “Meeting with Hayun’s mum”. Change the type here too, if needed.">예: "하윤이 어머님 상담". 종류도 여기서 바꿀 수 있어요.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 4. 게시판 -->
+  <section class="chapter" id="board">
+    <div class="chap-head"><span class="chap-num">4</span><h2 data-en="Find it on the board">게시판에서 찾기</h2></div>
+    <p class="chap-lead" data-en="Tap “Board” at the bottom. Records are grouped by date, newest first.">아래 <b>게시판</b>을 누르면 날짜별로 최신 것부터 쌓여 있어요.</p>
+    <div class="figure-row">
+      <div class="phone" aria-hidden="true">
+        <div class="ph-bar"><span class="ph-burger"></span><span>기록 게시판</span></div>
+        <div class="ph-list">
+          <div class="ph-search hot">🔍 말한 내용·제목으로 찾기</div>
+          <div class="d">2026.11.16 (월)</div>
+          <div class="c"><b>하윤이 어머님 상담</b>낮잠 시간에 담요를…</div>
+          <div class="c"><b>주간 회의</b>다음 주 행사 준비…</div>
+          <div class="d">2026.11.13 (금)</div>
+          <div class="c"><b>혼자 메모</b>교구 주문할 것…</div>
+        </div>
+        <div class="ph-tabs"><span style="color:var(--ink)">게시판</span><span>녹음</span><span>관리</span><span>내 정보</span></div>
+      </div>
+      <div class="card">
+        <ol style="margin:0;padding-left:20px">
+          <li data-en="Search: type a word that was said (e.g. “nap”) and tap Search">검색: 대화에 나온 말(예: "낮잠")을 넣고 <b>찾기</b></li>
+          <li data-en="Filter: tap Consultation / Meeting / Memo / Unassigned">고르기: <b>상담 · 회의 · 혼자 메모 · 미지정</b> 버튼</li>
+          <li data-en="Listen: open a record and tap “Play from start”, or tap a time to play from there">듣기: 기록을 열고 <b>처음부터 듣기</b>, 또는 <b>시간</b>을 누르면 그 부분부터</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 관리자 -->
+  <section class="chapter" id="admin">
+    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">5</span><h2><span data-en="Manage teachers">선생님 관리</span><span class="badge-admin" data-en="Admins">관리자</span></h2></div>
+    <p class="chap-lead" data-en="Open the ☰ menu at the top left → Teacher accounts. (Or the “Admin” card on the home screen.)">왼쪽 위 <b>☰ 메뉴</b> → <b>선생님 계정</b>을 눌러요. 홈 화면의 <b>관리자 페이지</b> 카드로도 들어갈 수 있어요.</p>
+    <ol class="steps">
+      <li><div class="step-title" data-en="Approve requests">가입 신청 승인</div><p class="step-body" data-en="New requests show at the top with a number. Tap “Approve” and they can sign in.">새 신청은 맨 위에 숫자와 함께 떠요. <b>승인</b>을 누르면 바로 들어올 수 있어요.</p></li>
+      <li><div class="step-title" data-en="Add a teacher yourself">직접 추가하기</div><p class="step-body" data-en="Scroll down to “Add account”: name, English name, position, phone, email. Set a password if you like and tell them.">아래 <b>계정 추가</b>에 이름·영어 이름·직책·전화번호·이메일을 넣어요. 비밀번호를 정해 주면 본인에게 알려 주세요.</p></li>
+      <li><div class="step-title" data-en="Forgot password?">비밀번호를 잊었다고 하면</div><p class="step-body" data-en="Tap “Edit details” → enter a new password → Save. Tell them the new one.">그 선생님의 <b>정보 수정</b> → <b>새 비밀번호 정해 주기</b>에 넣고 저장 → 본인에게 알려 주기.</p></li>
+      <li><div class="step-title" data-en="Someone left?">그만둔 선생님은</div><p class="step-body" data-en="Tap “Block access”. Their records stay; they just can’t sign in.">"접속 막기"를 누르세요. 기록은 그대로 남고, 로그인만 못 해요.</p></li>
+    </ol>
+  </section>
+
+  <!-- 6. 메일 -->
+  <section class="chapter" id="mail">
+    <div class="chap-head"><span class="chap-num" style="background:var(--mustard-ink)">6</span><h2><span data-en="Turn on email codes">인증번호 메일 켜기</span><span class="badge-admin" data-en="Admins · once">관리자 · 한 번</span></h2></div>
+    <p class="chap-lead" data-en="Needed for “Sign in with an email code”. Uses a Gmail account; no domain needed.">"이메일 인증번호 로그인"을 쓰려면 한 번 해 두세요. Gmail 하나면 돼요.</p>
+    <ol class="steps">
+      <li><div class="step-title" data-en="Turn on 2-Step Verification for the Gmail account">Gmail에 2단계 인증 켜기</div><p class="step-body" data-en="Google account → Security → 2-Step Verification.">구글 계정 → <b>보안</b> → <b>2단계 인증</b>. 이미 켜져 있으면 건너뛰어요.</p></li>
+      <li><div class="step-title" data-en="Make an app password">앱 비밀번호 만들기</div><p class="step-body"><span data-en="Open the page below, type “Jina Recorder” as the name, then Create.">아래 페이지를 열고 이름에 "지나기록기"를 넣고 <b>만들기</b>.</span><br><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" data-en="Open Google app passwords">구글 앱 비밀번호 열기</a></p></li>
+      <li><div class="step-title" data-en="Paste it into Settings">설정에 붙여 넣기</div><p class="step-body" data-en="☰ menu → Settings → Email: choose Gmail, enter the Gmail address and the 16 characters → Save.">☰ 메뉴 → <b>설정</b> → <b>이메일 발송</b>: Gmail 고르기 → Gmail 주소와 16자리 넣기 → <b>저장</b>.</p></li>
+      <li><div class="step-title" data-en="Send a test email">테스트 메일 보내기</div><p class="step-body" data-en="If it arrives, you’re done. The login screen now shows the email-code option.">메일이 오면 끝이에요. 로그인 화면에 인증번호 로그인이 나타나요.</p></li>
+    </ol>
+  </section>
+
+  <!-- 자주 묻는 것 -->
+  <section class="chapter faq" id="faq">
+    <div class="chap-head"><span class="chap-num">?</span><h2 data-en="Common questions">자주 묻는 것</h2></div>
+    <details><summary data-en="It says the microphone isn’t allowed">마이크를 허용하라고 나와요</summary><p data-en="iPhone: Settings › Safari › Microphone › Allow. Android: tap the lock next to the address → Permissions → Microphone.">아이폰: 설정 › 사파리 › 마이크 › 허용. 안드로이드: 주소창 옆 자물쇠 → 권한 → 마이크 허용.</p></details>
+    <details><summary data-en="The text didn’t appear">글자가 안 나왔어요</summary><p data-en="The audio is still saved. Open the record and tap “Retry transcription”.">녹음은 저장돼 있어요. 기록을 열고 <b>다시 받아쓰기</b>를 눌러 보세요.</p></details>
+    <details><summary data-en="The recording stopped on my iPhone">아이폰에서 녹음이 멈췄어요</summary><p data-en="iPhone stops recording when the screen turns off or you switch apps. Keep this screen open until you press Stop. What was recorded up to then is saved.">아이폰은 화면이 꺼지거나 다른 앱으로 가면 녹음이 멈춰요. 끝날 때까지 이 화면을 켜 두세요. 멈추기 전까지 녹음된 건 저장돼 있어요.</p></details>
+    <details><summary data-en="I can’t see the Admin menu">관리 메뉴가 안 보여요</summary><p data-en="Only admins see it. Ask an admin to make you an admin.">관리자에게만 보여요. 관리자에게 "관리자로" 바꿔 달라고 하세요.</p></details>
+  </section>
+
+  <a class="back" href="/" data-en="Back to Jina Recorder">지나기록기로 돌아가기</a>
+</div>
+<script>
+(function () {
+  var nodes = Array.prototype.slice.call(document.querySelectorAll('[data-en]'));
+  nodes.forEach(function (n) { n.setAttribute('data-ko', n.innerHTML); });
+  var lang = 'ko';
+  try { var saved = localStorage.getItem('vn_lang'); if (saved === 'en' || saved === 'ko') lang = saved; } catch (e) {}
+  var btn = document.getElementById('lang');
+  function apply() {
+    document.documentElement.lang = lang;
+    nodes.forEach(function (n) { n.innerHTML = lang === 'en' ? n.getAttribute('data-en') : n.getAttribute('data-ko'); });
+    btn.textContent = lang === 'en' ? '한국어' : 'EN';
+  }
+  btn.addEventListener('click', function () {
+    lang = lang === 'en' ? 'ko' : 'en';
+    try { localStorage.setItem('vn_lang', lang); } catch (e) {}
+    apply();
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

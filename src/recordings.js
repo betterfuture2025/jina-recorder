@@ -163,17 +163,33 @@ export async function listRecordings(env, request, user) {
   const binds = [];
   if (!all) { where.push('r.owner_id = ?'); binds.push(user.id); }
   if (KINDS.includes(kind)) { where.push('r.kind = ?'); binds.push(kind); }
+  const q = (url.searchParams.get('q') || '').trim().slice(0, 60);
+  if (q) {
+    const like = '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
+    where.push(`(r.title LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM chunk_text t2 WHERE t2.recording_id = r.id AND t2.text LIKE ? ESCAPE '\\'))`);
+    binds.push(like, like);
+  }
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.kind, r.title, r.status, r.started_at, r.ended_at, r.duration_sec, r.consent,
             u.name AS owner_name, u.email AS owner_email,
             (SELECT group_concat(text, ' ') FROM (SELECT text FROM chunk_text t WHERE t.recording_id = r.id
                AND t.status = 'done' ORDER BY t.seq LIMIT 3)) AS snippet,
+            ${q ? `(SELECT text FROM chunk_text t3 WHERE t3.recording_id = r.id AND t3.text LIKE ? ESCAPE '\\' ORDER BY t3.seq LIMIT 1)` : 'NULL'} AS hit,
             (SELECT COUNT(*) FROM chunks c WHERE c.recording_id = r.id) AS chunk_count
        FROM recordings r JOIN users u ON u.id = r.owner_id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY r.started_at DESC LIMIT ?`
-  ).bind(...binds, limit).all();
-  const items = results.map((r) => ({ ...r, snippet: r.snippet ? r.snippet.slice(0, 140) : '' }));
+  ).bind(...(q ? ['%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%'] : []), ...binds, limit).all();
+  const items = results.map((r) => {
+    let snippet = r.snippet ? r.snippet.slice(0, 140) : '';
+    if (r.hit) {
+      const i = r.hit.toLowerCase().indexOf(q.toLowerCase());
+      const from = Math.max(0, i - 40);
+      snippet = (from ? '…' : '') + r.hit.slice(from, from + 140);
+    }
+    const { hit, ...rest } = r;
+    return { ...rest, snippet };
+  });
   return json({ items });
 }
 

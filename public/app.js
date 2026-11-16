@@ -101,6 +101,11 @@ function editUserSheet(u, onSaved) {
       <h2 id="eu-title">${esc(t('editInfo'))}</h2>
       <p>${esc(u.email)}</p>
       ${profileFields(u)}
+      <div class="sheet-sub">
+        <label class="field"><span>${esc(t('setNewPassword'))}</span>
+          <input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="${esc(t('setNewPasswordPh'))}">
+          <small>${esc(u.has_password ? t('hasPasswordNote') : t('noPasswordNote'))}</small></label>
+      </div>
       <div id="eu-error"></div>
       <div class="row">
         <button type="button" class="btn btn-quiet" data-act="cancel">${esc(t('cancel'))}</button>
@@ -114,9 +119,12 @@ function editUserSheet(u, onSaved) {
   const form = wrap.querySelector('form');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    const pw = d.password; delete d.password;
     try {
-      await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: Object.fromEntries(new FormData(form)) });
-      close(); toast(t('saved')); onSaved();
+      await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: d });
+      if (pw) await api(`/api/admin/users/${u.id}/password`, { method: 'PUT', body: { password: pw } });
+      close(); toast(pw ? t('passwordSetFor', { name: u.name || u.email }) : t('saved')); onSaved();
     } catch (err) { wrap.querySelector('#eu-error').innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
   });
   form.querySelector('input').focus();
@@ -151,6 +159,9 @@ const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><re
 const GOOGLE_G = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
 const ICONS = {
+  help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.7-.8 1.2v.4M12 16.8v.2"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`,
+  eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
@@ -201,11 +212,21 @@ function renderLogin() {
         <p>${esc(t('loginBody'))}</p>
         ${errText && !errText.startsWith('err_') ? `<div class="notice error" role="alert">${errText}</div>` : ''}
         <div id="login-msg"></div>
+        <form id="pw-login" class="login-form" novalidate ${loginMode === 'code' ? 'hidden' : ''}>
+          <label class="field"><span>${esc(t('emailLabel'))}</span>
+            <input name="email" type="email" inputmode="email" autocomplete="username" required placeholder="name@example.com" value="${esc(loginEmail)}"></label>
+          <label class="field"><span>${esc(t('password'))}</span>
+            <span class="pw-wrap"><input name="password" type="password" autocomplete="current-password" required>
+              <button type="button" class="pw-eye" data-act="eye" aria-label="${esc(t('showPassword'))}">${ICONS.eye}</button></span></label>
+          <button class="btn btn-primary btn-block" type="submit">${esc(t('loginButton'))}</button>
+          ${state.config.emailReady ? `<button type="button" class="link-btn mode-link" data-mode="code">${esc(t('useCodeInstead'))}</button>` : ''}
+        </form>
         ${state.config.emailReady ? `
-        <form id="email-start" class="login-form" novalidate>
+        <form id="email-start" class="login-form" novalidate ${loginMode === 'code' ? '' : 'hidden'}>
           <label class="field"><span>${esc(t('emailLabel'))}</span>
             <input name="email" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${esc(loginEmail)}"></label>
           <button class="btn btn-primary btn-block" type="submit">${esc(t('sendCode'))}</button>
+          <button type="button" class="link-btn mode-link" data-mode="password">${esc(t('usePasswordInstead'))}</button>
         </form>
         <form id="email-verify" class="login-form" novalidate hidden>
           <p class="code-sent"></p>
@@ -217,14 +238,54 @@ function renderLogin() {
             <button class="link-btn" type="button" data-act="change-email" style="text-align:right">${esc(t('changeEmail'))}</button>
           </div>
         </form>` : ''}
-        ${state.config.emailReady && state.config.googleReady ? `<div class="or"><span>${esc(t('or'))}</span></div>` : ''}
-        ${state.config.googleReady || !state.config.emailReady ? `<a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>` : ''}
+        ${state.config.googleReady ? `<div class="or"><span>${esc(t('or'))}</span></div>
+        <a class="btn btn-google btn-block" href="/auth/login">${GOOGLE_G}<span>${esc(t('loginGoogle'))}</span></a>` : ''}
         <p class="signup-cta">${esc(t('noAccount'))} <a href="#/signup">${esc(t('signupLink'))}</a></p>
-        <p class="login-foot">${esc(t('loginOnlyAllowed'))} <a href="/privacy.html">${esc(t('privacy'))}</a></p>
+        <p class="login-foot">${esc(t('loginOnlyAllowed'))} <a href="/guide.html">${esc(t('guide'))}</a> · <a href="/privacy.html">${esc(t('privacy'))}</a></p>
       </div>
     </div>`;
   bindLang(app, renderLogin);
   if (state.config.emailReady) bindEmailLogin();
+  bindPasswordLogin();
+}
+
+let loginMode = 'password';
+
+function bindPasswordLogin() {
+  const form = app.querySelector('#pw-login');
+  const msg = app.querySelector('#login-msg');
+  app.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
+    loginMode = b.dataset.mode;
+    const em = app.querySelector(loginMode === 'code' ? '#pw-login [name=email]' : '#email-start [name=email]');
+    if (em && em.value) loginEmail = em.value.trim().toLowerCase();
+    renderLogin();
+  }));
+  app.querySelectorAll('[data-act="eye"]').forEach((b) => b.addEventListener('click', () => {
+    const input = b.parentElement.querySelector('input');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('[type=submit]');
+    const data = Object.fromEntries(new FormData(form));
+    loginEmail = (data.email || '').trim().toLowerCase();
+    if (!loginEmail.includes('@') || !data.password) {
+      msg.innerHTML = `<div class="notice error" role="alert">${esc(t('fillEmailPassword'))}</div>`;
+      return;
+    }
+    btn.disabled = true;
+    msg.innerHTML = '';
+    try {
+      await api('/api/login/password', { method: 'POST', body: { email: loginEmail, password: data.password } });
+      const { user } = await api('/api/me');
+      state.user = user;
+      history.replaceState(null, '', '/');
+      render();
+    } catch (err) {
+      msg.innerHTML = `<div class="notice error" role="alert">${esc(err.message)}</div>`;
+      btn.disabled = false;
+    }
+  });
 }
 
 let loginEmail = '';
@@ -305,6 +366,11 @@ function renderSignup(done) {
           <form id="signup" novalidate>
             ${profileFields({}, { required: true })}
             <label class="field"><span>${esc(t('emailLabel'))}</span><input name="email" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com"></label>
+            <label class="field"><span>${esc(t('passwordOptional'))}</span>
+              <input name="password" type="password" autocomplete="new-password" minlength="8">
+              <small>${esc(t('passwordSignupHelp'))}</small></label>
+            <label class="field"><span>${esc(t('passwordConfirm'))}</span>
+              <input name="password2" type="password" autocomplete="new-password"></label>
             <label class="field"><span>${esc(t('signupNote'))}</span><input name="note" type="text" placeholder="${esc(t('signupNotePh'))}"></label>
             <button class="btn btn-primary btn-block" type="submit">${esc(t('signupSubmit'))}</button>
           </form>
@@ -317,9 +383,16 @@ function renderSignup(done) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = form.querySelector('[type=submit]');
+    const body = Object.fromEntries(new FormData(form));
+    if (body.password !== body.password2) {
+      app.querySelector('#signup-msg').innerHTML = `<div class="notice error" role="alert">${esc(t('passwordMismatch'))}</div>`;
+      return;
+    }
+    delete body.password2;
+    if (!body.password) delete body.password;
     btn.disabled = true;
     try {
-      await api('/api/signup', { method: 'POST', body: Object.fromEntries(new FormData(form)) });
+      await api('/api/signup', { method: 'POST', body });
       renderSignup(true);
     } catch (err) {
       app.querySelector('#signup-msg').innerHTML = `<div class="notice error" role="alert">${esc(err.message)}</div>`;
@@ -493,25 +566,39 @@ function recCard(r) {
 // ── 기록 ─────────────────────────────────────────────────
 
 let recordsFilter = '';
+let recordsQuery = '';
 async function pageRecords() {
   const filters = [['', 'all'], ['consult', 'kindConsult'], ['meeting', 'kindMeeting'], ['memo', 'kindMemo'], ['unassigned', 'unassigned']];
   app.innerHTML = shell('records', `
     <h2 class="page-title">${esc(t('recordsTitle'))}</h2>
+    <form class="search" role="search" id="search">
+      <label class="visually-hidden" for="q">${esc(t('searchPlaceholder'))}</label>
+      ${ICONS.search}
+      <input id="q" name="q" type="search" value="${esc(recordsQuery)}" placeholder="${esc(t('searchPlaceholder'))}" enterkeyhint="search">
+      <button type="submit" class="btn btn-primary btn-small">${esc(t('searchButton'))}</button>
+    </form>
     <div class="chips" role="group" aria-label="${esc(t('recordsTitle'))}">
       ${filters.map(([k, key]) => `<button type="button" class="chip" data-filter="${k}" aria-pressed="${recordsFilter === k}">${esc(t(key))}</button>`).join('')}
     </div>
     <div id="list"><p class="lead">${esc(t('loading'))}</p></div>`);
   bindCommon();
   app.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { recordsFilter = b.dataset.filter; pageRecords(); }));
+  app.querySelector('#search').addEventListener('submit', (e) => { e.preventDefault(); recordsQuery = app.querySelector('#q').value.trim(); pageRecords(); });
   let items;
   try {
     const q = new URLSearchParams({ limit: '100' });
     if (recordsFilter) q.set('kind', recordsFilter);
+    if (recordsQuery) q.set('q', recordsQuery);
     if (state.user.role === 'admin') q.set('all', '1');
     ({ items } = await api('/api/recordings?' + q));
   } catch (err) { return handleError(err); }
   const list = app.querySelector('#list');
   if (!list) return;
+  if (!items.length && recordsQuery) {
+    list.innerHTML = `<p class="lead">${esc(t('searchResult', { q: recordsQuery, n: 0 }))} <button type="button" class="link-btn" data-act="clear-q">${esc(t('clearSearch'))}</button></p>`;
+    list.querySelector('[data-act="clear-q"]').addEventListener('click', () => { recordsQuery = ''; pageRecords(); });
+    return;
+  }
   if (!items.length) {
     list.innerHTML = `<div class="empty-jina">
       <div><h3>${esc(t('recordsEmpty'))}</h3><p>${esc(t('recordsEmptyBody'))}</p>
@@ -520,7 +607,29 @@ async function pageRecords() {
     </div>`;
     return;
   }
-  list.innerHTML = `<ul class="rec-list">${items.map(recCard).join('')}</ul>`;
+  // 날짜별로 묶어서 게시판처럼
+  const groups = [];
+  for (const r of items) {
+    const day = fmtStamp(r.started_at, { time: false });
+    if (!groups.length || groups[groups.length - 1].day !== day) groups.push({ day, items: [] });
+    groups[groups.length - 1].items.push(r);
+  }
+  list.innerHTML = `
+    ${recordsQuery ? `<p class="lead">${esc(t('searchResult', { q: recordsQuery, n: items.length }))} <button type="button" class="link-btn" data-act="clear-q">${esc(t('clearSearch'))}</button></p>` : ''}
+    ${groups.map((g) => `<h3 class="day-head">${esc(g.day)}</h3><ul class="rec-list">${g.items.map(recCard).join('')}</ul>`).join('')}`;
+  const cq = list.querySelector('[data-act="clear-q"]');
+  if (cq) cq.addEventListener('click', () => { recordsQuery = ''; pageRecords(); });
+  if (recordsQuery) highlight(list.querySelectorAll('.rec-card-snippet, .rec-card-title'), recordsQuery);
+}
+
+function highlight(nodes, q) {
+  const needle = q.toLowerCase();
+  nodes.forEach((el) => {
+    const text = el.textContent;
+    const i = text.toLowerCase().indexOf(needle);
+    if (i < 0) return;
+    el.innerHTML = esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+  });
 }
 
 // ── 기록 상세 ─────────────────────────────────────────────
@@ -856,6 +965,9 @@ async function pageUsers() {
         <label class="field shrink" style="width:8.5em"><span>${esc(t('role'))}</span>
           <select name="role"><option value="teacher">${esc(t('roleTeacher'))}</option><option value="admin">${esc(t('roleAdmin'))}</option></select></label>
       </div>
+      <label class="field"><span>${esc(t('passwordOptional'))}</span>
+        <input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="${esc(t('setNewPasswordPh'))}">
+        <small>${esc(t('addUserPasswordHelp'))}</small></label>
       <div id="add-error"></div>
       <button class="btn btn-primary" type="submit">${esc(t('add'))}</button>
     </form>
@@ -874,6 +986,7 @@ async function pageUsers() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form));
+    if (!data.password) delete data.password;
     try {
       const { user } = await api('/api/admin/users', { method: 'POST', body: data });
       toast(plain(t('userAdded', { email: user.email })));
@@ -959,12 +1072,28 @@ async function pageSettings() {
     <form class="panel" data-section="email">
       <h2>${esc(t('secEmail'))}</h2>
       <p class="desc">${esc(t('secEmailDesc2'))}</p>
+      <fieldset class="seg-field">
+        <legend>${esc(t('mailProvider'))}</legend>
+        <label class="radio"><input type="radio" name="email.provider" value="gmail" ${(s['email.provider'].value || 'gmail') === 'gmail' ? 'checked' : ''}> <span><b>Gmail</b> · ${esc(t('mailGmailShort'))}</span></label>
+        <label class="radio"><input type="radio" name="email.provider" value="resend" ${s['email.provider'].value === 'resend' ? 'checked' : ''}> <span><b>Resend</b> · ${esc(t('mailResendShort'))}</span></label>
+      </fieldset>
+      <div class="provider-box" data-for="gmail">
+        <ol class="steps">${t('gmailSteps').map((x) => `<li>${x}</li>`).join('')}</ol>
+        <p><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">${esc(t('openAppPasswords'))}</a></p>
+        <label class="field"><span>${esc(t('gmailUser'))}</span>
+          <input name="email.gmail_user" type="email" spellcheck="false" autocomplete="off" placeholder="center@gmail.com" value="${esc(s['email.gmail_user'].value)}"></label>
+        <label class="field"><span>${esc(t('gmailPass'))}</span>
+          <input name="email.gmail_pass" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(s['email.gmail_pass'].set ? t('secretPlaceholder') : 'abcd efgh ijkl mnop')}">
+          ${s['email.gmail_pass'].set ? `<small>${t('secretSet', { hint: s['email.gmail_pass'].hint })}</small>` : ''}</label>
+      </div>
+      <div class="provider-box" data-for="resend">
       <label class="field"><span>${esc(t('resendKey'))}</span>
         <input name="email.resend_key" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(s['email.resend_key'].set ? t('secretPlaceholder') : 're_...')}">
         ${s['email.resend_key'].set ? `<small>${t('secretSet', { hint: s['email.resend_key'].hint })}</small>` : ''}</label>
       <label class="field"><span>${esc(t('mailFrom'))}</span>
         <input name="email.from" type="text" spellcheck="false" autocomplete="off" placeholder="지나기록기 &lt;noreply@도메인&gt;" value="${esc(s['email.from'].value)}">
         <small>${esc(t('mailFromHelp'))}</small></label>
+      </div>
       <div class="test-result"></div>
       <div class="row" style="flex-wrap:wrap">
         <button class="btn btn-primary shrink" type="submit">${esc(t('save'))}</button>
@@ -985,6 +1114,13 @@ async function pageSettings() {
       pageSettings();
     } catch (err) { toast(err.message); }
   }));
+
+  const syncProvider = () => {
+    const v = (app.querySelector('[name="email.provider"]:checked') || {}).value || 'gmail';
+    app.querySelectorAll('.provider-box').forEach((b) => { b.hidden = b.dataset.for !== v; });
+  };
+  app.querySelectorAll('[name="email.provider"]').forEach((r) => r.addEventListener('change', syncProvider));
+  syncProvider();
 
   app.querySelector('[data-act="test-mail"]').addEventListener('click', async (e) => {
     const out = e.target.closest('form').querySelector('.test-result');
@@ -1043,6 +1179,15 @@ function pageMe() {
       <div id="me-error"></div>
       <button class="btn btn-primary" type="submit">${esc(t('save'))}</button>
     </form>
+    <form class="panel" id="my-pw" novalidate>
+      <h2>${esc(u.has_password ? t('changePassword') : t('makePassword'))}</h2>
+      <p class="desc">${esc(u.has_password ? t('changePasswordDesc') : t('makePasswordDesc'))}</p>
+      ${u.has_password ? `<label class="field"><span>${esc(t('currentPassword'))}</span><input name="currentPassword" type="password" autocomplete="current-password"></label>` : ''}
+      <label class="field"><span>${esc(t('newPassword'))}</span><input name="newPassword" type="password" autocomplete="new-password" minlength="8"></label>
+      <label class="field"><span>${esc(t('passwordConfirm'))}</span><input name="newPassword2" type="password" autocomplete="new-password"></label>
+      <div id="pw-error"></div>
+      <button class="btn btn-primary" type="submit">${esc(t('save'))}</button>
+    </form>
     <div class="panel">
       <h2>${esc(t('language'))}</h2>
       <div class="seg" role="group" aria-label="${esc(t('language'))}">
@@ -1055,9 +1200,26 @@ function pageMe() {
       <p class="desc">${esc(t('installBody'))}</p>
       ${install}
     </div>
+    <a class="admin-card" href="/guide.html" style="margin-top:14px">
+      <span class="admin-card-icon">${ICONS.help}</span>
+      <span class="admin-card-text"><b>${esc(t('guide'))}</b><small>${esc(t('guideBody'))}</small></span>
+      <span class="admin-card-arrow" aria-hidden="true">›</span>
+    </a>
     <div class="section"><button class="btn btn-quiet btn-block" data-act="logout" type="button">${esc(t('logout'))}</button></div>`);
   bindCommon();
   app.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); pageMe(); }));
+  const myPw = app.querySelector('#my-pw');
+  myPw.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(myPw));
+    const box = app.querySelector('#pw-error');
+    if (d.newPassword !== d.newPassword2) { box.innerHTML = `<div class="notice error">${esc(t('passwordMismatch'))}</div>`; return; }
+    try {
+      await api('/api/me/password', { method: 'PUT', body: { currentPassword: d.currentPassword, newPassword: d.newPassword } });
+      state.user.has_password = 1;
+      toast(t('passwordSaved')); pageMe();
+    } catch (err) { box.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+  });
   const myInfo = app.querySelector('#my-info');
   myInfo.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1112,6 +1274,7 @@ function openMenu(btn) {
         ${link('#/admin/settings', ICONS.gear, t('adminSettings'))}` : ''}
       <div class="menu-group">${esc(t('tabMe'))}</div>
       ${link('#/me', ICONS.me, t('myInfo'))}
+      <a href="/guide.html" class="menu-link">${ICONS.help}<span>${esc(t('guide'))}</span></a>
       <button type="button" class="menu-link" data-act="menu-logout">${ICONS.logout}<span>${esc(t('logout'))}</span></button>
     </nav>`;
   document.body.appendChild(wrap);

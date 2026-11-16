@@ -4,6 +4,7 @@ import { json, fail, HttpError, normEmail } from './util.js';
 import { ensureSchema } from './schema.js';
 import { startEmailLogin, verifyEmailLogin, testMail } from './emailLogin.js';
 import { submitSignup, listSignups, decideSignup } from './signup.js';
+import { passwordLogin, changeMyPassword, adminSetPassword } from './password.js';
 import {
   createRecording, putChunk, finishRecording, updateRecording, listRecordings, getRecording,
   getChunkAudio, deleteRecording, retryStt,
@@ -62,6 +63,7 @@ async function route(request, env, ctx) {
   if (path === '/api/setup/status' && m === 'GET') return setupStatus(env, request);
   if (path === '/api/setup' && m === 'POST') return runSetup(env, request);
   if (path === '/api/signup' && m === 'POST') return submitSignup(env, request);
+  if (path === '/api/login/password' && m === 'POST') return passwordLogin(env, request);
   if (path === '/api/login/email/start' && m === 'POST') return startEmailLogin(env, request);
   if (path === '/api/login/email/verify' && m === 'POST') return verifyEmailLogin(env, request);
 
@@ -71,6 +73,7 @@ async function route(request, env, ctx) {
     if (!user) return fail(401, 'login_required');
     return json({ user });
   }
+  if (path === '/api/me/password' && m === 'PUT') return changeMyPassword(env, request, await requireUser(env, request, ctx));
   if (path === '/api/me' && m === 'PATCH') return updateMe(env, request, await requireUser(env, request, ctx));
   if (path === '/api/logout' && m === 'POST') return logout(env, request);
 
@@ -84,6 +87,8 @@ async function route(request, env, ctx) {
     if (path === '/api/admin/users' && m === 'POST') return addUser(env, request);
     const um = path.match(/^\/api\/admin\/users\/([\w-]+)$/);
     if (um && m === 'PATCH') return updateUser(env, request, me, um[1]);
+    const pm = path.match(/^\/api\/admin\/users\/([\w-]+)\/password$/);
+    if (pm && m === 'PUT') return adminSetPassword(env, request, me, pm[1]);
     if (um && m === 'DELETE') return deleteUser(env, me, um[1]);
     if (path === '/api/admin/settings' && m === 'GET') return getAdminSettings(env, request);
     if (path === '/api/admin/settings' && m === 'PUT') return putAdminSettings(env, request, me);
