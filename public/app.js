@@ -166,6 +166,9 @@ const ICONS = {
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`,
   pause: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></svg>',
   play: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>`,
   stop: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>`,
   back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
@@ -644,6 +647,7 @@ async function pageRecordDetail(id) {
   const chunks = data.chunks;
   const failed = chunks.filter((c) => c.status === 'failed' || c.status === 'pending').length;
   const kinds = ['consult', 'meeting', 'memo', 'unassigned'];
+  const doneCount = chunks.filter((c) => c.status === 'done' && c.text).length;
   const text = chunks.map((c) => `
     <li class="line" data-seq="${c.seq}">
       <button type="button" class="line-time" data-play="${c.seq}" aria-label="${esc(t('playFrom', { time: fmtClock(c.start_ms || 0) }))}">${fmtClock(c.start_ms || 0)}</button>
@@ -670,6 +674,13 @@ async function pageRecordDetail(id) {
     <section class="section">
       <div class="section-head"><h2>${esc(t('transcript'))}</h2>
         ${failed ? `<button type="button" class="link-btn" data-act="retry">${esc(t('retryStt', { n: failed }))}</button>` : ''}</div>
+      ${doneCount ? `
+      <div class="export-bar">
+        <button type="button" class="btn" data-exp="copy">${ICONS.copy}<span>${esc(t('expCopy'))}</span></button>
+        <button type="button" class="btn" data-exp="file">${ICONS.download}<span>${esc(t('expFile'))}</span></button>
+        ${navigator.share ? `<button type="button" class="btn" data-exp="share">${ICONS.share}<span>${esc(t('expShare'))}</span></button>` : ''}
+        <label class="exp-opt"><input type="checkbox" id="exp-times"> <span>${esc(t('expTimes'))}</span></label>
+      </div>` : ''}
       ${chunks.length ? `<ol class="transcript">${text}</ol>` : `<p class="lead">${esc(t('noChunks'))}</p>`}
     </section>
 
@@ -706,6 +717,50 @@ async function pageRecordDetail(id) {
     playAt(0);
   });
   app.querySelectorAll('[data-play]').forEach((b) => b.addEventListener('click', () => playAt(seqs.indexOf(Number(b.dataset.play)))));
+
+  // 내보내기: 복사 / 파일 / 공유
+  const buildExport = () => {
+    const withTimes = app.querySelector('#exp-times')?.checked;
+    const title = titleEl.value.trim() || t('untitled');
+    const head = [
+      title,
+      `${t('expWhen')}: ${fmtStamp(r.started_at)}${r.duration_sec ? ` · ${fmtDur(r.duration_sec)}` : ''}`,
+      `${t('expKind')}: ${kindLabel(r.kind)}`,
+      `${t('expBy')}: ${r.owner_name || r.owner_email || ''}`,
+    ];
+    const body = chunks.filter((c) => c.status === 'done' && c.text)
+      .map((c) => (withTimes ? `[${fmtClock(c.start_ms || 0)}] ` : '') + c.text.trim());
+    return { title, text: head.join('\n') + '\n\n' + body.join(withTimes ? '\n' : '\n\n') + '\n' };
+  };
+  const flash = (btn, msg) => {
+    const span = btn.querySelector('span'); const old = span.textContent;
+    span.textContent = msg; setTimeout(() => (span.textContent = old), 1600);
+  };
+  const expBtn = (k) => app.querySelector(`[data-exp="${k}"]`);
+  if (expBtn('copy')) expBtn('copy').addEventListener('click', async () => {
+    const { text } = buildExport();
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    flash(expBtn('copy'), t('copied'));
+  });
+  if (expBtn('file')) expBtn('file').addEventListener('click', () => {
+    const { title, text } = buildExport();
+    const d = new Date((r.started_at || '').replace(' ', 'T') + 'Z');
+    const ymd = isNaN(d) ? '' : `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_`;
+    const name = (ymd + title).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80) + '.txt';
+    const blob = new Blob(['\ufeff' + text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  if (expBtn('share')) expBtn('share').addEventListener('click', async () => {
+    const { title, text } = buildExport();
+    try { await navigator.share({ title, text }); } catch {}
+  });
 
   const retry = app.querySelector('[data-act="retry"]');
   if (retry) retry.addEventListener('click', async () => {

@@ -534,6 +534,11 @@ ol.steps li { margin-bottom: 6px; }
 .player { display: flex; align-items: center; gap: 12px; margin: 8px 0 0; flex-wrap: wrap; }
 .player .btn svg { width: 18px; height: 18px; }
 .player-status { font-size: 14px; color: var(--muted); }
+.export-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.export-bar .btn { min-height: 44px; padding: 0 14px; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; }
+.export-bar .btn svg { width: 18px; height: 18px; }
+.exp-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); margin-left: 4px; }
+.exp-opt input { width: 18px; height: 18px; accent-color: var(--teal); }
 .transcript { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius); }
 .transcript .line { display: grid; grid-template-columns: 64px 1fr; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .transcript .line:first-child { border-top: 0; }
